@@ -748,7 +748,20 @@ sshpam_init(struct ssh *ssh, Authctxt *authctxt)
 		return (-1);
 	}
 #endif
-	return (0);
+        debug("PAM: setting PAM LOG_SESSION_ID to \"%s\"", get_log_session_id());
+	{
+		char log_session_id_env[HOST_NAME_MAX + 50];
+		snprintf(log_session_id_env, sizeof(log_session_id_env),
+				"LOG_SESSION_ID=%s", get_log_session_id());
+		sshpam_err = pam_putenv(sshpam_handle, log_session_id_env);
+		if (sshpam_err != PAM_SUCCESS) {
+			pam_end(sshpam_handle, sshpam_err);
+			sshpam_handle = NULL;
+			return (-1);
+		}
+	}
+
+        return (0);
 }
 
 static void
