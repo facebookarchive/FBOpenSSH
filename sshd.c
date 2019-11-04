@@ -1240,6 +1240,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				    options.log_level,
 				    options.log_facility,
 				    log_stderr);
+
+				set_log_session_id();  // Set log session ID for this session
 				if (rexec_flag)
 					close(config_s[0]);
 				else {
