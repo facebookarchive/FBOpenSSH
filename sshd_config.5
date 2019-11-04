@@ -984,6 +984,26 @@ Multiple
 options are permitted.
 For more information on routing domains, see
 .Xr rdomain 4 .
+.It Cm LogFormatJson
+If structured logging is enabled by setting one or more
+.Cm LogFormatKeys
+then output the key value pairs
+in JSON.  The default is
+.Cm no.
+.It Cm LogFormatPrefix
+If structured logging is enabled by setting one or more
+.Cm LogFormatKeys
+then prepend the line with this value.
+.It Cm LogFormatKeys
+Output a structured logging line upon every session open and close with keys
+defined in this list.  The format of the line can be controlled with
+.Cm LogFormatKeys
+and will be prepended with the value set with
+.Cm LogFormatPrefix.
+.Cm LogFormatKeys
+accepts the keys described in the
+.Sx LOG_KEYS
+section.
 .It Cm LoginGraceTime
 The server disconnects after this time if the user has not
 successfully logged in.
@@ -1718,6 +1738,74 @@ to not use one.
 The default is
 .Pa /usr/X11R6/bin/xauth .
 .El
+.Sh LOG_KEYS
+The
+.Cm LogFormatKeys
+argument accepts one or more of the following keys
+.Pp
+.Bl -tag -width Ds -compact -offset indent
+.It Cm auth_info
+Additional information about the authentication method (e.g. kerberos principal
+or certificate fingerprint).
+.sp
+.It Cm auth_successful
+\'true' if authentication was successful, otherwise 'false'
+.sp
+.It Cm cert_id
+The Key ID from the certificate, if a certificate was used to authenticate.
+.sp
+.It Cm cert_serial
+The serial number of the certificate used for authentication, if a certificate
+was used to authenticate.
+.sp
+.It Cm command
+The command run (non-interactive sessions only).
+.sp
+.It Cm duration
+The duration of the session in seconds (end_time - start_time)
+.sp
+.It Cm end_time
+Seconds since the epoch that the session was closed
+.sp
+.It Cm method
+The authentication method used to open the session.
+.sp
+.It Cm pam_pid
+Contains the pid if the session was authorized with PAM.
+.sp
+.It Cm pid
+The process ID of sshd.
+.sp
+.It Cm principal
+The certificate principal used for authentication, if a certificate was used to
+authenticate.
+.sp
+.It Cm remote_ip
+The ip address of the remote host.
+.sp
+.It Cm remote_port
+The port used by the remote host.
+.sp
+.It Cm server_ip
+The local ip address of the host running sshd.
+.sp
+.It Cm server_port
+The local port which sshd is listening on.
+.sp
+.It Cm session_id
+The unique identifier associated with this session.
+.sp
+.It Cm session_state
+The state of the session, i.e. Session {opened,closed,failed}.
+.sp
+.It Cm start_time
+Seconds since the epoch that the session was opened
+.sp
+.It Cm user
+The user id used to open the session.
+.sp
+.El
+.sp
 .Sh TIME FORMATS
 .Xr sshd 8
 command-line arguments and configuration file options that specify time

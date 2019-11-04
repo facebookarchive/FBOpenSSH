@@ -1,0 +1,7 @@
+{
+        "project.name" : "fb-openssh",
+        "arc.feature.start.default" : "master",
+        "arc.land.onto.default" : "master",
+        "base" : "git:HEAD^",
+        "phabricator.uri" : "https://phabricator.fb.com/"
+}

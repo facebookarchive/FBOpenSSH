@@ -98,7 +98,7 @@ enum sshkey_private_format {
 /* key is stored in external hardware */
 #define SSHKEY_FLAG_EXT		0x0001
 
-#define SSHKEY_CERT_MAX_PRINCIPALS	256
+#define SSHKEY_CERT_MAX_PRINCIPALS	1024
 /* XXX opaquify? */
 struct sshkey_cert {
 	struct sshbuf	*certblob; /* Kept around for use on wire */

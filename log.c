@@ -193,6 +193,33 @@ logdie(const char *fmt,...)
 	cleanup_exit(255);
 }
 
+void
+set_log_session_id()
+{
+	struct timeval tv;
+	char hostname[HOST_NAME_MAX + 1];
+	char session_id[HOST_NAME_MAX + 20];
+	char *s;
+	if (gethostname(hostname, sizeof(hostname)) != 0) {
+		*hostname = '\0';
+	}
+	gettimeofday(&tv, NULL);
+	snprintf(session_id, sizeof(session_id), "%s:%x.%x",
+	    hostname, tv.tv_sec, tv.tv_usec);
+	setenv("LOG_SESSION_ID", session_id, 1);
+}
+
+const char *
+get_log_session_id()
+{
+	const char *id = getenv("LOG_SESSION_ID");
+	if (!id) {
+		set_log_session_id();
+		id = getenv("LOG_SESSION_ID");
+	}
+	return id;
+}
+
 /* Log this message (information that usually should go to the log). */
 
 void
@@ -462,17 +489,53 @@ do_log(LogLevel level, const char *fmt, va_list args)
 		tmp_handler(level, fmtbuf, log_handler_ctx);
 		log_handler = tmp_handler;
 	} else if (log_on_stderr) {
-		snprintf(msgbuf, sizeof msgbuf, "%.*s\r\n",
-		    (int)sizeof msgbuf - 3, fmtbuf);
+		snprintf(msgbuf, sizeof msgbuf, "%.*s session=%s\r\n",
+		    (int)sizeof msgbuf - 3, fmtbuf, get_log_session_id());
 		(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
 	} else {
 #if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
 		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
-		syslog_r(pri, &sdata, "%.500s", fmtbuf);
+		syslog_r(pri, &sdata, "%.500s session=%s", fmtbuf, get_log_session_id());
 		closelog_r(&sdata);
 #else
 		openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
-		syslog(pri, "%.500s", fmtbuf);
+		syslog(pri, "%.500s session=%s", fmtbuf, get_log_session_id());
+		closelog();
+#endif
+	}
+	errno = saved_errno;
+}
+
+/* Custom function to log to syslog, to handle the session logging code
+ */
+void
+do_log_slog_payload(const char *payload)
+{
+#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+	struct syslog_data sdata = SYSLOG_DATA_INIT;
+#endif
+	int pri = LOG_INFO;
+	int saved_errno = errno;
+	LogLevel level = SYSLOG_LEVEL_INFO;
+	log_handler_fn *tmp_handler;
+
+	if (log_handler != NULL) {
+		/* Avoid recursion */
+		tmp_handler = log_handler;
+		log_handler = NULL;
+		tmp_handler(level, payload, log_handler_ctx);
+		log_handler = tmp_handler;
+	} else if (log_on_stderr) {
+		(void)write(log_stderr_fd, payload, strlen(payload));
+		(void)write(log_stderr_fd, "\r\n", 2);
+	} else {
+#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
+		syslog_r(pri, &sdata, "%s", payload);
+		closelog_r(&sdata);
+#else
+		openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
+		syslog(pri, "%s", payload);
 		closelog();
 #endif
 	}

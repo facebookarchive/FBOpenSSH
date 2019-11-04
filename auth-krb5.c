@@ -192,7 +192,7 @@ auth_krb5_password(Authctxt *authctxt, const char *password)
 
  out:
 	restore_uid();
-	
+
 	free(platform_client);
 
 	if (problem) {
@@ -240,33 +240,54 @@ krb5_cleanup_proc(Authctxt *authctxt)
 #ifndef HEIMDAL
 krb5_error_code
 ssh_krb5_cc_gen(krb5_context ctx, krb5_ccache *ccache) {
-	int tmpfd, ret, oerrno;
-	char ccname[40];
+	int tmpfd, oerrno;
+	char *cctemplate = NULL, *ccname = NULL;
+	char uid[20], pid[20];
 	mode_t old_umask;
 
-	ret = snprintf(ccname, sizeof(ccname),
-	    "FILE:/tmp/krb5cc_%d_XXXXXXXXXX", geteuid());
-	if (ret < 0 || (size_t)ret >= sizeof(ccname))
-		return ENOMEM;
-
-	old_umask = umask(0177);
-	tmpfd = mkstemp(ccname + strlen("FILE:"));
-	oerrno = errno;
-	umask(old_umask);
-	if (tmpfd == -1) {
-		logit("mkstemp(): %.100s", strerror(oerrno));
-		return oerrno;
+	/* use ccache definition from ssh section of /etc/krb5.conf if it exists,
+	 * otherwise default to /tmp/krb5cc_%u_XXXXXXXX */
+	krb5_appdefault_string(ctx, "ssh", NULL, "ccache",
+	    "FILE:/tmp/krb5cc_%u_XXXXXXXX", &cctemplate);
+	if (cctemplate == NULL) {
+		oerrno = ENOMEM;
+		goto out;
+	}
+	snprintf(uid, sizeof(uid), "%d", geteuid());
+	snprintf(pid, sizeof(pid), "%ld", (long) getpid());
+	ccname = percent_expand(cctemplate, "u", uid, "p", pid);
+	if (ccname == NULL) {
+		oerrno = ENOMEM;
+		goto out;
 	}
 
-	if (fchmod(tmpfd,S_IRUSR | S_IWUSR) == -1) {
+	/* if the cache name ends with 6+ X's, use it as a mkstemp template */
+	if (strncmp("XXXXXX", ccname + strnlen(ccname, sizeof(ccname)) - 6, 6) == 0) {
+		old_umask = umask(0177);
+		tmpfd = mkstemp(ccname + strlen("FILE:"));
 		oerrno = errno;
-		logit("fchmod(): %.100s", strerror(oerrno));
-		close(tmpfd);
-		return oerrno;
-	}
-	close(tmpfd);
+		umask(old_umask);
+		if (tmpfd == -1) {
+			logit("mkstemp(): %.100s", strerror(oerrno));
+			goto out;
+		}
 
-	return (krb5_cc_resolve(ctx, ccname, ccache));
+		if (fchmod(tmpfd,S_IRUSR | S_IWUSR) == -1) {
+			oerrno = errno;
+			logit("fchmod(): %.100s", strerror(oerrno));
+			close(tmpfd);
+			goto out;
+		}
+		close(tmpfd);
+	}
+
+	debug3("using krb5 ccache %s", ccname);
+	oerrno = krb5_cc_resolve(ctx, ccname, ccache);
+
+out:
+	free(cctemplate);
+	free(ccname);
+	return oerrno;
 }
 #endif /* !HEIMDAL */
 #endif /* KRB5 */

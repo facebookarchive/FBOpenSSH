@@ -578,7 +578,7 @@ start_sshd ()
 
 	trace "wait for sshd"
 	i=0;
-	while [ ! -f $PIDFILE -a $i -lt 10 ]; do
+	while [ ! -f $PIDFILE -a $i -lt 3 ]; do
 		i=`expr $i + 1`
 		sleep $i
 	done
