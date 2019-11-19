@@ -96,6 +96,9 @@
 #include "monitor_wrap.h"
 #include "sftp.h"
 #include "atomicio.h"
+#include "slog.h"
+
+#define SSH_MAX_PUBKEY_BYTES 16384
 
 #if defined(KRB5) && defined(USE_AFS)
 #include <kafs.h>
@@ -709,6 +712,7 @@ do_exec(struct ssh *ssh, Session *s, const char *command)
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
 	    s->self);
+	    slog_log_session();
 
 #ifdef SSH_AUDIT_EVENTS
 	if (command != NULL)
@@ -983,11 +987,18 @@ copy_environment(char **source, char ***env, u_int *envsize)
 static char **
 do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 {
-	char buf[256];
+	char buf[SSH_MAX_PUBKEY_BYTES];
+	char *pbuf = &buf[0];
 	size_t n;
 	u_int i, envsize;
 	char *ocp, *cp, *value, **env, *laddr;
 	struct passwd *pw = s->pw;
+	Authctxt *authctxt = s->authctxt;
+	struct sshkey *key;
+	size_t len = 0;
+	ssize_t total = 0;
+	struct sshkey_cert *cert;
+
 #if !defined (HAVE_LOGIN_CAP) && !defined (HAVE_CYGWIN)
 	char *path = NULL;
 #endif
@@ -1181,9 +1192,57 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 		child_set_env(&env, &envsize, "SSH_USER_AUTH", auth_info_file);
 	if (s->ttyfd != -1)
 		child_set_env(&env, &envsize, "SSH_TTY", s->tty);
-	if (original_command)
+	if (original_command) {
 		child_set_env(&env, &envsize, "SSH_ORIGINAL_COMMAND",
 		    original_command);
+		/*
+		* Set SSH_CERT_PRINCIPALS to be the principals on the ssh certificate.
+		* Only do so when a force command is present to prevent the client
+		* from changing the value of SSH_CERT_PRINCIPALS. For example, when a
+		* client is given shell access, the client can easily change the
+		* value of an environment variable by running, e.g.,
+		* ssh user@host.address 'SSH_CERT_PRINCIPALS=attacker env'
+		*/
+
+		if (authctxt->nprev_keys > 0) {
+			key = authctxt->prev_keys[authctxt->nprev_keys-1];
+			/* If a user was authorized by a certificate, set SSH_CERT_PRINCIPALS */
+			if (sshkey_is_cert(key)) {
+				cert = key->cert;
+
+				for (i = 0; i < cert->nprincipals - 1; ++i) {
+					/*
+					* total: bytes written to buf so far
+					* 2: one for comma and one for '\0' to be added by snprintf
+					* We stop at the first principal overflowing buf.
+					*/
+					if (total + strlen(cert->principals[i]) + 2 > SSH_MAX_PUBKEY_BYTES)
+						break;
+
+					len = snprintf(pbuf, SSH_MAX_PUBKEY_BYTES-total, "%s,",
+					    cert->principals[i]);
+					/* pbuf advances by len, the '\0' at the end will be overwritten */
+					pbuf += len;
+					total += len;
+				}
+
+				if (total + strlen(cert->principals[i]) + 1 <= SSH_MAX_PUBKEY_BYTES) {
+					len = snprintf(pbuf, SSH_MAX_PUBKEY_BYTES-total, "%s",
+					    cert->principals[i]);
+					total += len;
+				} else if (total > 0)
+					/*
+					* If we hit the overflow condition, remove the trailing comma.
+					* We only do so if the overflowing principal is not the first one on the
+					* certificate so that there is at least one principal in buf
+					*/
+					buf[total-1] = '\0';
+
+				if (total > 0)
+					child_set_env(&env, &envsize, "SSH_CERT_PRINCIPALS", buf);
+			}
+		}
+	}
 
 	if (debug_flag) {
 		/* dump the environment */
@@ -1327,7 +1386,7 @@ safely_chroot(const char *path, uid_t uid)
 			memcpy(component, path, cp - path);
 			component[cp - path] = '\0';
 		}
-	
+
 		debug3("%s: checking '%s'", __func__, component);
 
 		if (stat(component, &st) != 0)
@@ -1408,7 +1467,7 @@ do_setusercontext(struct passwd *pw)
 			perror("unable to set user context (setuser)");
 			exit(1);
 		}
-		/* 
+		/*
 		 * FreeBSD's setusercontext() will not apply the user's
 		 * own umask setting unless running with the user's UID.
 		 */
@@ -1935,6 +1994,8 @@ session_pty_req(struct ssh *ssh, Session *s)
 		return 0;
 	}
 	debug("session_pty_req: session %d alloc %s", s->self, s->tty);
+	verbose("Allocated pty %s for user %s session %d",
+					s->tty, s->pw->pw_name, s->self);
 
 	ssh_tty_parse_modes(ssh, s->ttyfd);
 
@@ -2034,6 +2095,7 @@ session_shell_req(struct ssh *ssh, Session *s)
 
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
+	verbose("Shell Request for user %s", s->pw->pw_name);
 	return do_exec(ssh, s, NULL) == 0;
 }
 
@@ -2048,6 +2110,8 @@ session_exec_req(struct ssh *ssh, Session *s)
 	    (r = sshpkt_get_end(ssh)) != 0)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
 
+	slog_set_command(command);
+	verbose("Exec Request for user %s with command %s", s->pw->pw_name, command);
 	success = do_exec(ssh, s, command) == 0;
 	free(command);
 	return success;
@@ -2087,7 +2151,7 @@ session_env_req(struct ssh *ssh, Session *s)
 
 	for (i = 0; i < options.num_accept_env; i++) {
 		if (match_pattern(name, options.accept_env[i])) {
-			debug2("Setting env %d: %s=%s", s->num_env, name, val);
+			verbose("Setting env %d: %s=%s user=%s", s->num_env, name, val, s->pw->pw_name);
 			s->env = xrecallocarray(s->env, s->num_env,
 			    s->num_env + 1, sizeof(*s->env));
 			s->env[s->num_env].name = name;
@@ -2096,7 +2160,7 @@ session_env_req(struct ssh *ssh, Session *s)
 			return (1);
 		}
 	}
-	debug2("Ignoring env request %s: disallowed name", name);
+	verbose("Ignoring env request %s user=%s : disallowed name", name, s->pw->pw_name);
 
  fail:
 	free(name);
@@ -2716,4 +2780,3 @@ session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
 		remote = ssh_remote_ipaddr(ssh);
 	return remote;
 }
-

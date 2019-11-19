@@ -482,6 +482,7 @@ server_request_direct_tcpip(struct ssh *ssh, int *reason, const char **errmsg)
 	char *target = NULL, *originator = NULL;
 	u_int target_port = 0, originator_port = 0;
 	int r;
+	uid_t user;
 
 	if ((r = sshpkt_get_cstring(ssh, &target, NULL)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &target_port)) != 0 ||
@@ -499,6 +500,11 @@ server_request_direct_tcpip(struct ssh *ssh, int *reason, const char **errmsg)
 		*reason = SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED;
 		goto out;
 	}
+
+	user = getuid();
+	logit("Tunnel: %s:%d -> %s:%d UID(%d) user %s",
+	    originator, originator_port, target, target_port, user,
+	    getpwuid(user)->pw_name);
 
 	debug("%s: originator %s port %u, target %s port %u", __func__,
 	    originator, originator_port, target, target_port);

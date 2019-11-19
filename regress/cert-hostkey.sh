@@ -1,4 +1,4 @@
-#	$OpenBSD: cert-hostkey.sh,v 1.17 2018/10/31 11:09:27 dtucker Exp $
+#	$OpenBSD: cert-hostkey.sh,v 1.23 2020/01/03 03:02:26 djm Exp $
 #	Placed in the Public Domain.
 
 tid="certified host keys"
@@ -248,7 +248,7 @@ test_one() {
 test_one "user-certificate"	failure "-n $HOSTS"
 test_one "empty principals"	success "-h"
 test_one "wrong principals"	failure "-h -n foo"
-test_one "cert not yet valid"	failure "-h -V20200101:20300101"
+test_one "cert not yet valid"	failure "-h -V20300101:20320101"
 test_one "cert expired"		failure "-h -V19800101:19900101"
 test_one "cert valid interval"	success "-h -V-1w:+2w"
 test_one "cert has constraints"	failure "-h -Oforce-command=false"

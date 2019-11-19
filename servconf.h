@@ -20,6 +20,8 @@
 
 #define MAX_SUBSYSTEMS		256	/* Max # subsystems. */
 
+#define MAX_LOGFORMAT_KEYS      256     /* Max # LogFormatKeys */
+
 /* permit_root_login */
 #define	PERMIT_NOT_SET		-1
 #define	PERMIT_NO		0
@@ -211,6 +213,12 @@ typedef struct {
 	int	fingerprint_hash;
 	int	expose_userauth_info;
 	u_int64_t timing_secret;
+
+	char   *log_format_prefix;
+	u_int  num_log_format_keys;
+	char   *log_format_keys[MAX_LOGFORMAT_KEYS];
+	int log_format_json;	/* 1 to return "token": "token_val" in log format */
+
 }       ServerOptions;
 
 /* Information about the incoming connection as used by Match */

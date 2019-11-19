@@ -180,6 +180,10 @@ initialize_server_options(ServerOptions *options)
 	options->fingerprint_hash = -1;
 	options->disable_forwarding = -1;
 	options->expose_userauth_info = -1;
+	options->log_format_prefix = NULL;
+	options->num_log_format_keys = 0;
+	options->log_format_json = -1;
+
 }
 
 /* Returns 1 if a string option is unset or set to "none" or 0 otherwise. */
@@ -425,6 +429,8 @@ fill_default_server_options(ServerOptions *options)
 		options->disable_forwarding = 0;
 	if (options->expose_userauth_info == -1)
 		options->expose_userauth_info = 0;
+	if (options->log_format_json == -1)
+		options->log_format_json = 0;
 
 	assemble_algorithms(options);
 
@@ -510,6 +516,10 @@ typedef enum {
 	sStreamLocalBindMask, sStreamLocalBindUnlink,
 	sAllowStreamLocalForwarding, sFingerprintHash, sDisableForwarding,
 	sExposeAuthInfo, sRDomain,
+	/* Structured Logging options.  Unless sLogFormatKeys is set,
+	    structured logging is disabled */
+	sLogFormatPrefix, sLogFormatKeys, sLogFormatJson,
+
 	sDeprecated, sIgnore, sUnsupported
 } ServerOpCodes;
 
@@ -658,6 +668,10 @@ static struct {
 	{ "exposeauthinfo", sExposeAuthInfo, SSHCFG_ALL },
 	{ "rdomain", sRDomain, SSHCFG_ALL },
 	{ "casignaturealgorithms", sCASignatureAlgorithms, SSHCFG_ALL },
+	{ "logformatprefix", sLogFormatPrefix, SSHCFG_GLOBAL },
+	{ "logformatkeys", sLogFormatKeys, SSHCFG_GLOBAL },
+	{ "logformatjson", sLogFormatJson, SSHCFG_GLOBAL },
+
 	{ NULL, sBadOption, 0 }
 };
 
@@ -2166,6 +2180,29 @@ process_server_config_line(ServerOptions *options, char *line,
 		if (*activep && *charptr == NULL)
 			*charptr = xstrdup(arg);
 		break;
+	case sLogFormatPrefix:
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0') {
+			fatal("%.200s line %d: invalid log format prefix",
+			    filename, linenum);
+		}
+		options->log_format_prefix = xstrdup(arg);
+		break;
+
+	case sLogFormatKeys:
+		while ((arg = strdelim(&cp)) && *arg != '\0') {
+			if (options->num_log_format_keys >= MAX_LOGFORMAT_KEYS)
+				fatal("%s line %d: too long format keys.",
+				    filename, linenum);
+			if (!*activep)
+				continue;
+			options->log_format_keys[options->num_log_format_keys++] = xstrdup(arg);
+		}
+		break;
+
+	case sLogFormatJson:
+		intptr = &options->log_format_json;
+		goto parse_flag;
 
 	case sDeprecated:
 	case sIgnore:
@@ -2606,6 +2643,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_fmtint(sStreamLocalBindUnlink, o->fwd_opts.streamlocal_bind_unlink);
 	dump_cfg_fmtint(sFingerprintHash, o->fingerprint_hash);
 	dump_cfg_fmtint(sExposeAuthInfo, o->expose_userauth_info);
+	dump_cfg_fmtint(sLogFormatJson, o->log_format_json);
 
 	/* string arguments */
 	dump_cfg_string(sPidFile, o->pid_file);
@@ -2637,6 +2675,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_string(sPubkeyAcceptedKeyTypes, o->pubkey_key_types ?
 	    o->pubkey_key_types : KEX_DEFAULT_PK_ALG);
 	dump_cfg_string(sRDomain, o->routing_domain);
+	dump_cfg_string(sLogFormatPrefix, o->log_format_prefix);
 
 	/* string arguments requiring a lookup */
 	dump_cfg_string(sLogLevel, log_level_name(o->log_level));
@@ -2657,7 +2696,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_strarray(sSetEnv, o->num_setenv, o->setenv);
 	dump_cfg_strarray_oneline(sAuthenticationMethods,
 	    o->num_auth_methods, o->auth_methods);
-
+	dump_cfg_strarray(sLogFormatKeys, o->num_log_format_keys, o->log_format_keys);
 	/* other arguments */
 	for (i = 0; i < o->num_subsystems; i++)
 		printf("subsystem %s %s\n", o->subsystem_name[i],

@@ -122,6 +122,9 @@
 #include "auth-options.h"
 #include "version.h"
 #include "ssherr.h"
+#include "slog.h"
+#include <time.h>
+
 
 /* Re-exec fds */
 #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
@@ -1897,6 +1900,7 @@ main(int ac, char **av)
 	}
 	/* Reinitialize the log (because of the fork above). */
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
+	slog_init();
 
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
@@ -2062,8 +2066,15 @@ main(int ac, char **av)
 	    rdomain == NULL ? "" : " rdomain \"",
 	    rdomain == NULL ? "" : rdomain,
 	    rdomain == NULL ? "" : "\"");
-	free(laddr);
 
+
+	slog_set_connection(remote_ip,
+	    remote_port,
+	    laddr,
+	    ssh_local_port(ssh),
+	    get_log_session_id());
+
+	free(laddr);
 	/*
 	 * We don't want to listen forever unless the other side
 	 * successfully authenticates itself.  So we set up an alarm which is
@@ -2302,6 +2313,7 @@ do_ssh2_kex(struct ssh *ssh)
 void
 cleanup_exit(int i)
 {
+	slog_exit_handler();
 	if (the_active_state != NULL && the_authctxt != NULL) {
 		do_cleanup(the_active_state, the_authctxt);
 		if (use_privsep && privsep_is_preauth &&
