@@ -196,28 +196,28 @@ logdie(const char *fmt,...)
 void
 set_log_session_id()
 {
-        struct timeval tv;
-        char hostname[HOST_NAME_MAX + 1];
-        char session_id[HOST_NAME_MAX + 20];
-        char *s;
-        if (gethostname(hostname, sizeof(hostname)) != 0) {
-                *hostname = '\0';
-        }
-        gettimeofday(&tv, NULL);
-        snprintf(session_id, sizeof(session_id), "%s:%x.%x",
-                 hostname, tv.tv_sec, tv.tv_usec);
-        setenv("LOG_SESSION_ID", session_id, 1);
+	struct timeval tv;
+	char hostname[HOST_NAME_MAX + 1];
+	char session_id[HOST_NAME_MAX + 20];
+	char *s;
+	if (gethostname(hostname, sizeof(hostname)) != 0) {
+		*hostname = '\0';
+	}
+	gettimeofday(&tv, NULL);
+	snprintf(session_id, sizeof(session_id), "%s:%x.%x",
+	    hostname, tv.tv_sec, tv.tv_usec);
+	setenv("LOG_SESSION_ID", session_id, 1);
 }
 
 const char *
 get_log_session_id()
 {
-        const char *id = getenv("LOG_SESSION_ID");
-        if (!id) {
-                 set_log_session_id();
-                 id = getenv("LOG_SESSION_ID");
-        }
-        return id;
+	const char *id = getenv("LOG_SESSION_ID");
+	if (!id) {
+		set_log_session_id();
+		id = getenv("LOG_SESSION_ID");
+	}
+	return id;
 }
 
 /* Log this message (information that usually should go to the log). */

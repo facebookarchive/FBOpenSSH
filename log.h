@@ -81,7 +81,7 @@ void	 do_log2(LogLevel, const char *, ...)
 void	 do_log(LogLevel, const char *, va_list);
 void	 cleanup_exit(int) __attribute__((noreturn));
 
-void		set_log_session_id();
+void	set_log_session_id();
 const char *	get_log_session_id();
 
 #endif
