@@ -96,6 +96,8 @@
 #include "monitor_wrap.h"
 #include "sftp.h"
 #include "atomicio.h"
+#include "slog.h"
+
 
 #if defined(KRB5) && defined(USE_AFS)
 #include <kafs.h>
@@ -709,6 +711,7 @@ do_exec(struct ssh *ssh, Session *s, const char *command)
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
 	    s->self);
+	    slog_log_session();
 
 #ifdef SSH_AUDIT_EVENTS
 	if (command != NULL)
@@ -1327,7 +1330,7 @@ safely_chroot(const char *path, uid_t uid)
 			memcpy(component, path, cp - path);
 			component[cp - path] = '\0';
 		}
-	
+
 		debug3("%s: checking '%s'", __func__, component);
 
 		if (stat(component, &st) != 0)
@@ -1408,7 +1411,7 @@ do_setusercontext(struct passwd *pw)
 			perror("unable to set user context (setuser)");
 			exit(1);
 		}
-		/* 
+		/*
 		 * FreeBSD's setusercontext() will not apply the user's
 		 * own umask setting unless running with the user's UID.
 		 */
@@ -2048,6 +2051,7 @@ session_exec_req(struct ssh *ssh, Session *s)
 	    (r = sshpkt_get_end(ssh)) != 0)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
 
+	slog_set_command(command);
 	success = do_exec(ssh, s, command) == 0;
 	free(command);
 	return success;
@@ -2716,4 +2720,3 @@ session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
 		remote = ssh_remote_ipaddr(ssh);
 	return remote;
 }
-

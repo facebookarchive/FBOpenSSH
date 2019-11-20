@@ -65,6 +65,7 @@
 #include "monitor_wrap.h"
 #include "authfile.h"
 #include "match.h"
+#include "slog.h"
 #include "ssherr.h"
 #include "channels.h" /* XXX for session.h */
 #include "session.h" /* XXX for child_set_env(); refactor? */
@@ -335,6 +336,7 @@ check_principals_line(struct ssh *ssh, char *cp, const struct sshkey_cert *cert,
 		debug3("%s: matched principal \"%.100s\"",
 		    loc, cert->principals[i]);
 		found = 1;
+		slog_set_principal(cp);
 	}
 	if (found && authoptsp != NULL) {
 		*authoptsp = opts;
@@ -656,6 +658,7 @@ check_authkey_line(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	    (unsigned long long)key->cert->serial,
 	    sshkey_type(found), fp, loc);
 
+	    slog_set_cert_serial(key->cert->serial);
  success:
 	if (finalopts == NULL)
 		fatal("%s: internal error: missing options", __func__);
@@ -806,6 +809,7 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 		*authoptsp = final_opts;
 		final_opts = NULL;
 	}
+	slog_set_cert_id(key->cert->key_id);
 	ret = 1;
  out:
 	sshauthopt_free(principals_opts);

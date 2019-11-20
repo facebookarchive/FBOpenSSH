@@ -84,4 +84,6 @@ void	 cleanup_exit(int) __attribute__((noreturn));
 void	set_log_session_id();
 const char *	get_log_session_id();
 
+void     do_log_slog_payload(const char *);
+
 #endif

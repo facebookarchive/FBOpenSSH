@@ -505,3 +505,39 @@ do_log(LogLevel level, const char *fmt, va_list args)
 	}
 	errno = saved_errno;
 }
+
+/* Custom function to log to syslog, to handle the session logging code
+ */
+void
+do_log_slog_payload(const char *payload)
+{
+#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+	struct syslog_data sdata = SYSLOG_DATA_INIT;
+#endif
+	int pri = LOG_INFO;
+	int saved_errno = errno;
+	LogLevel level = SYSLOG_LEVEL_INFO;
+	log_handler_fn *tmp_handler;
+
+	if (log_handler != NULL) {
+		/* Avoid recursion */
+		tmp_handler = log_handler;
+		log_handler = NULL;
+		tmp_handler(level, payload, log_handler_ctx);
+		log_handler = tmp_handler;
+	} else if (log_on_stderr) {
+		(void)write(log_stderr_fd, payload, strlen(payload));
+		(void)write(log_stderr_fd, "\r\n", 2);
+	} else {
+#if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
+		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
+		syslog_r(pri, &sdata, "%s", payload);
+		closelog_r(&sdata);
+#else
+		openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
+		syslog(pri, "%s", payload);
+		closelog();
+#endif
+	}
+	errno = saved_errno;
+}

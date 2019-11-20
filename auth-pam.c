@@ -93,6 +93,7 @@ extern char *__progname;
 #include "auth-pam.h"
 #include "canohost.h"
 #include "log.h"
+#include "slog.h"
 #include "msg.h"
 #include "packet.h"
 #include "misc.h"
@@ -1203,9 +1204,12 @@ do_pam_session(struct ssh *ssh)
 	if (sshpam_err != PAM_SUCCESS)
 		fatal("PAM: failed to set PAM_CONV: %s",
 		    pam_strerror(sshpam_handle, sshpam_err));
+
 	sshpam_err = pam_open_session(sshpam_handle, 0);
-	if (sshpam_err == PAM_SUCCESS)
+	if (sshpam_err == PAM_SUCCESS) {
+		slog_pam_session_opened();
 		sshpam_session_open = 1;
+	}
 	else {
 		sshpam_session_open = 0;
 		auth_restrict_session(ssh);

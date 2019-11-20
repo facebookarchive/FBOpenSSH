@@ -76,6 +76,7 @@
 #include "ssherr.h"
 #include "compat.h"
 #include "channels.h"
+#include "slog.h"
 
 /* import */
 extern ServerOptions options;
@@ -350,6 +351,7 @@ auth_log(struct ssh *ssh, int authenticated, int partial,
 	    extra != NULL ? extra : "");
 
 	free(extra);
+	slog_set_auth_data(authenticated, method, authctxt->user);
 
 #ifdef CUSTOM_FAILED_LOGIN
 	if (authenticated == 0 && !authctxt->postponed &&
@@ -560,6 +562,7 @@ auth_openprincipals(const char *file, struct passwd *pw, int strict_modes)
 struct passwd *
 getpwnamallow(struct ssh *ssh, const char *user)
 {
+	slog_set_user(user);
 #ifdef HAVE_LOGIN_CAP
 	extern login_cap_t *lc;
 #ifdef BSD_AUTH

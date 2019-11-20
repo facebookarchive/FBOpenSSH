@@ -25,6 +25,15 @@
 # Logging
 #SyslogFacility AUTH
 #LogLevel INFO
+# Structured logging
+# The default is no structured logging, to enable structured logging at least
+# one LogFormatKeys must be set.  LogFormatJson defaults to no (array) to keep
+# the log line size smaller, if keys are desired set LogFormatJson to yes
+LogFormatPrefix sshd_auth_msg:
+LogFormatKeys server_ip server_port remote_ip remote_port pid session_id method
+LogFormatKeys cert_id cert_serial principal user session_state auth_successful
+LogFormatKeys start_time command
+LogFormatJson yes
 
 # Authentication:
 
