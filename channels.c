@@ -3820,6 +3820,7 @@ int
 channel_setup_remote_fwd_listener(struct ssh *ssh, struct Forward *fwd,
     int *allocated_listen_port, struct ForwardOptions *fwd_opts)
 {
+  int success = 0;
 	if (!check_rfwd_permission(ssh, fwd)) {
 		ssh_packet_send_debug(ssh, "port forwarding refused");
 		if (fwd->listen_path != NULL)
@@ -3841,14 +3842,23 @@ channel_setup_remote_fwd_listener(struct ssh *ssh, struct Forward *fwd,
 			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
 		return 0;
 	}
-	if (fwd->listen_path != NULL) {
-		return channel_setup_fwd_listener_streamlocal(ssh,
+  if (fwd->listen_path != NULL) {
+		success = channel_setup_fwd_listener_streamlocal(ssh,
 		    SSH_CHANNEL_RUNIX_LISTENER, fwd, fwd_opts);
 	} else {
-		return channel_setup_fwd_listener_tcpip(ssh,
+		success = channel_setup_fwd_listener_tcpip(ssh,
 		    SSH_CHANNEL_RPORT_LISTENER, fwd, allocated_listen_port,
 		    fwd_opts);
 	}
+  logit("Remote forward request %s: listen=%s:%d connect=%s:%d"
+         " uid=%d",
+         success ? "succeeded" : "failed",
+         fwd->listen_host,
+         fwd->listen_port,
+         ssh_remote_ipaddr(ssh),
+         ssh_remote_port(ssh),
+         getuid());
+  return success;
 }
 
 /*
@@ -4059,7 +4069,7 @@ channel_request_rforward_cancel_streamlocal(struct ssh *ssh, const char *path)
 
 	return 0;
 }
- 
+
 /*
  * Request cancellation of remote forwarding of a connection from local side.
  */
@@ -4618,7 +4628,7 @@ x11_create_display_inet(struct ssh *ssh, int x11_display_offset,
 				if ((errno != EINVAL) && (errno != EAFNOSUPPORT)
 #ifdef EPFNOSUPPORT
 				    && (errno != EPFNOSUPPORT)
-#endif 
+#endif
 				    ) {
 					error("socket: %.100s", strerror(errno));
 					freeaddrinfo(aitop);
