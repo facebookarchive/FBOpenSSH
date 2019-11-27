@@ -1938,6 +1938,8 @@ session_pty_req(struct ssh *ssh, Session *s)
 		return 0;
 	}
 	debug("session_pty_req: session %d alloc %s", s->self, s->tty);
+	verbose("Allocated pty %s for user %s session %d",
+					s->tty, s->pw->pw_name, s->self);
 
 	ssh_tty_parse_modes(ssh, s->ttyfd);
 
@@ -2037,6 +2039,7 @@ session_shell_req(struct ssh *ssh, Session *s)
 
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
+	verbose("Shell Request for user %s", s->pw->pw_name);
 	return do_exec(ssh, s, NULL) == 0;
 }
 
@@ -2052,6 +2055,7 @@ session_exec_req(struct ssh *ssh, Session *s)
 		sshpkt_fatal(ssh, r, "%s: parse packet", __func__);
 
 	slog_set_command(command);
+	verbose("Exec Request for user %s with command %s", s->pw->pw_name, command);
 	success = do_exec(ssh, s, command) == 0;
 	free(command);
 	return success;
