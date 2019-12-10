@@ -335,6 +335,10 @@ check_principals_line(struct ssh *ssh, char *cp, const struct sshkey_cert *cert,
 			continue;
 		debug3("%s: matched principal \"%.100s\"",
 		    loc, cert->principals[i]);
+		verbose("Matched principal \"%.100s\" from %s against \"%.100s\" "
+		    "from cert",
+		    cp, loc, cert->principals[i]);
+
 		found = 1;
 		slog_set_principal(cp);
 	}
@@ -378,6 +382,8 @@ process_principals(struct ssh *ssh, FILE *f, const char *file,
 			found_principal = 1;
 	}
 	free(line);
+	if (!found_principal)
+		verbose("Did not match any principals from auth_principals_* files");
 	return found_principal;
 }
 
@@ -652,7 +658,7 @@ check_authkey_line(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	   keyopts->cert_principals == NULL ? pw->pw_name : NULL, &reason) != 0)
 		goto fail_reason;
 
-	verbose("Accepted certificate ID \"%s\" (serial %llu) "
+	verbose("Accepted cert ID \"%s\" (serial %llu) "
 	    "signed by CA %s %s found at %s",
 	    key->cert->key_id,
 	    (unsigned long long)key->cert->serial,
@@ -722,7 +728,7 @@ static int
 user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
     struct sshauthopt **authoptsp)
 {
-	char *ca_fp, *principals_file = NULL;
+	char *ca_fp, *key_fp, *principals_file = NULL;
 	const char *reason;
 	struct sshauthopt *principals_opts = NULL, *cert_opts = NULL;
 	struct sshauthopt *final_opts = NULL;
@@ -738,11 +744,16 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
 		return 0;
 
+	key_fp = sshkey_fingerprint(key, options.fingerprint_hash, SSH_FP_DEFAULT);
+
 	if ((r = sshkey_in_file(key->cert->signature_key,
 	    options.trusted_user_ca_keys, 1, 0)) != 0) {
 		debug2("%s: CA %s %s is not listed in %s: %s", __func__,
 		    sshkey_type(key->cert->signature_key), ca_fp,
 		    options.trusted_user_ca_keys, ssh_err(r));
+		verbose("CA %s %s is not listed in %s",
+		    sshkey_type(key->cert->signature_key), ca_fp,
+		    options.trusted_user_ca_keys);
 		goto out;
 	}
 	/*
@@ -793,6 +804,11 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 		if ((final_opts = sshauthopt_merge(principals_opts,
 		    cert_opts, &reason)) == NULL) {
  fail_reason:
+			verbose("Rejected cert ID \"%s\" with signature "
+			    "%s signed by %s CA %s via %s",
+			    key->cert->key_id, key_fp,
+			    sshkey_type(key->cert->signature_key), ca_fp,
+			    options.trusted_user_ca_keys);
 			error("%s", reason);
 			auth_debug_add("%s", reason);
 			goto out;
@@ -800,9 +816,10 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	}
 
 	/* Success */
-	verbose("Accepted certificate ID \"%s\" (serial %llu) signed by "
-	    "%s CA %s via %s", key->cert->key_id,
-	    (unsigned long long)key->cert->serial,
+	verbose("Accepted cert ID \"%s\" (serial %llu) with signature %s "
+	    "signed by %s CA %s via %s",
+	    key->cert->key_id,
+	    (unsigned long long)key->cert->serial, key_fp,
 	    sshkey_type(key->cert->signature_key), ca_fp,
 	    options.trusted_user_ca_keys);
 	if (authoptsp != NULL) {
@@ -817,6 +834,7 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	sshauthopt_free(final_opts);
 	free(principals_file);
 	free(ca_fp);
+	free(key_fp);
 	return ret;
 }
 
