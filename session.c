@@ -2095,7 +2095,7 @@ session_env_req(struct ssh *ssh, Session *s)
 
 	for (i = 0; i < options.num_accept_env; i++) {
 		if (match_pattern(name, options.accept_env[i])) {
-			debug2("Setting env %d: %s=%s", s->num_env, name, val);
+			verbose("Setting env %d: %s=%s user=%s", s->num_env, name, val, s->pw->pw_name);
 			s->env = xrecallocarray(s->env, s->num_env,
 			    s->num_env + 1, sizeof(*s->env));
 			s->env[s->num_env].name = name;
@@ -2104,7 +2104,7 @@ session_env_req(struct ssh *ssh, Session *s)
 			return (1);
 		}
 	}
-	debug2("Ignoring env request %s: disallowed name", name);
+	verbose("Ignoring env request %s user=%s : disallowed name", name, s->pw->pw_name);
 
  fail:
 	free(name);
