@@ -98,6 +98,7 @@
 #include "atomicio.h"
 #include "slog.h"
 
+#define SSH_MAX_PUBKEY_BYTES 16384
 
 #if defined(KRB5) && defined(USE_AFS)
 #include <kafs.h>
@@ -986,11 +987,18 @@ copy_environment(char **source, char ***env, u_int *envsize)
 static char **
 do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 {
-	char buf[256];
+	char buf[SSH_MAX_PUBKEY_BYTES];
+	char *pbuf = &buf[0];
 	size_t n;
 	u_int i, envsize;
 	char *ocp, *cp, *value, **env, *laddr;
 	struct passwd *pw = s->pw;
+	Authctxt *authctxt = s->authctxt;
+	struct sshkey *key;
+	size_t len = 0;
+	ssize_t total = 0;
+	struct sshkey_cert *cert;
+
 #if !defined (HAVE_LOGIN_CAP) && !defined (HAVE_CYGWIN)
 	char *path = NULL;
 #endif
@@ -1184,9 +1192,57 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 		child_set_env(&env, &envsize, "SSH_USER_AUTH", auth_info_file);
 	if (s->ttyfd != -1)
 		child_set_env(&env, &envsize, "SSH_TTY", s->tty);
-	if (original_command)
+	if (original_command) {
 		child_set_env(&env, &envsize, "SSH_ORIGINAL_COMMAND",
 		    original_command);
+		/*
+		* Set SSH_CERT_PRINCIPALS to be the principals on the ssh certificate.
+		* Only do so when a force command is present to prevent the client
+		* from changing the value of SSH_CERT_PRINCIPALS. For example, when a
+		* client is given shell access, the client can easily change the
+		* value of an environment variable by running, e.g.,
+		* ssh user@host.address 'SSH_CERT_PRINCIPALS=attacker env'
+		*/
+
+		if (authctxt->nprev_keys > 0) {
+			key = authctxt->prev_keys[authctxt->nprev_keys-1];
+			/* If a user was authorized by a certificate, set SSH_CERT_PRINCIPALS */
+			if (sshkey_is_cert(key)) {
+				cert = key->cert;
+
+				for (i = 0; i < cert->nprincipals - 1; ++i) {
+					/*
+					* total: bytes written to buf so far
+					* 2: one for comma and one for '\0' to be added by snprintf
+					* We stop at the first principal overflowing buf.
+					*/
+					if (total + strlen(cert->principals[i]) + 2 > SSH_MAX_PUBKEY_BYTES)
+						break;
+
+					len = snprintf(pbuf, SSH_MAX_PUBKEY_BYTES-total, "%s,",
+					    cert->principals[i]);
+					/* pbuf advances by len, the '\0' at the end will be overwritten */
+					pbuf += len;
+					total += len;
+				}
+
+				if (total + strlen(cert->principals[i]) + 1 <= SSH_MAX_PUBKEY_BYTES) {
+					len = snprintf(pbuf, SSH_MAX_PUBKEY_BYTES-total, "%s",
+					    cert->principals[i]);
+					total += len;
+				} else if (total > 0)
+					/*
+					* If we hit the overflow condition, remove the trailing comma.
+					* We only do so if the overflowing principal is not the first one on the
+					* certificate so that there is at least one principal in buf
+					*/
+					buf[total-1] = '\0';
+
+				if (total > 0)
+					child_set_env(&env, &envsize, "SSH_CERT_PRINCIPALS", buf);
+			}
+		}
+	}
 
 	if (debug_flag) {
 		/* dump the environment */
