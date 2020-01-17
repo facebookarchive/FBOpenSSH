@@ -350,6 +350,8 @@ auth_log(struct ssh *ssh, int authenticated, int partial,
 	    extra != NULL ? ": " : "",
 	    extra != NULL ? extra : "");
 
+	if (extra != NULL)
+		slog_set_auth_info(extra);
 	free(extra);
 	slog_set_auth_data(authenticated, method, authctxt->user);
 

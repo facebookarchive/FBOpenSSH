@@ -664,7 +664,7 @@ check_authkey_line(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 	    (unsigned long long)key->cert->serial,
 	    sshkey_type(found), fp, loc);
 
-	    slog_set_cert_serial(key->cert->serial);
+	slog_set_cert_serial(key->cert->serial);
  success:
 	if (finalopts == NULL)
 		fatal("%s: internal error: missing options", __func__);
@@ -827,6 +827,8 @@ user_cert_trusted_ca(struct ssh *ssh, struct passwd *pw, struct sshkey *key,
 		final_opts = NULL;
 	}
 	slog_set_cert_id(key->cert->key_id);
+	slog_set_cert_serial(key->cert->serial);
+
 	ret = 1;
  out:
 	sshauthopt_free(principals_opts);
