@@ -1,13 +1,10 @@
-# FBOpenSSH
+# Portable OpenSSH
 
-FBOpenSSH is a fork of OpenSSH with a set of patches developed at Facebook which have been used in production for the past few years.
+[![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/openssh.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:openssh)
 
-Facebook operates a large fleet of hosts and to support this the majority of patches fall into two areas:
- * Logging enhancements.  These patches output extra logging to syslog which is consumed downstream.  The structured log
- allow aggregated statistics of all aspects of SSH sessions.
- * Certificate handling.  Facebook [uses SSH certificates](https://engineering.fb.com/security/scalable-and-secure-access-with-ssh/) extensively and some changes to OpenSSH have been made to allow this.
+OpenSSH is a complete implementation of the SSH protocol (version 2) for secure remote login, command execution and file transfer. It includes a client ``ssh`` and server ``sshd``, file transfer utilities ``scp`` and ``sftp`` as well as tools for key generation (``ssh-keygen``), run-time key storage (``ssh-agent``) and a number of supporting programs.
 
-This fork of OpenSSH is currently only built and deployed on Linux.
+This is a port of OpenBSD's [OpenSSH](https://openssh.com) to most Unix-like operating systems, including Linux, OS X and Cygwin. Portable OpenSSH polyfills OpenBSD APIs that are not available elsewhere, adds sshd sandboxing for more operating systems and includes support for OS-native authentication and auditing (e.g. using PAM).
 
 ## Documentation
 
@@ -44,7 +41,7 @@ make && make tests
 ```
 
 See the [Build-time Customisation](#build-time-customisation) section below for configure options. If you plan on installing OpenSSH to your system, then you will usually want to specify destination paths.
-
+ 
 ### Building from git
 
 If building from git, you'll need [autoconf](https://www.gnu.org/software/autoconf/) installed to build the ``configure`` script. The following commands will check out and build portable OpenSSH from git:
@@ -70,14 +67,10 @@ Flag | Meaning
 ``--with-kerberos5`` | Enable Kerberos/GSSAPI support. Both [Heimdal](https://www.h5l.org/) and [MIT](https://web.mit.edu/kerberos/) Kerberos implementations are supported.
 ``--with-selinux`` | Enable [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux) support.
 
-## Code of Conduct
-See the [CODE_OF_CONDUCT.md][CODE_OF_CONDUCT.md] file for details.
+## Development
 
-## Contributors
-See the [CONTRIBUTING](CONTRIBUTING.md) file for how to help out.
-
-## License
-FBOpenSSH is BSD licensed.  The original OpenSSH license can be found in the [LICENSE](LICENSE) file.
+Portable OpenSSH development is discussed on the [openssh-unix-dev mailing list](https://lists.mindrot.org/mailman/listinfo/openssh-unix-dev) ([archive mirror](https://marc.info/?l=openssh-unix-dev)). Bugs and feature requests are tracked on our [Bugzilla](https://bugzilla.mindrot.org/).
 
 ## Reporting bugs
-Bugs can be reported in the Github issue tracker for this repository.
+
+_Non-security_ bugs may be reported to the developers via [Bugzilla](https://bugzilla.mindrot.org/) or via the mailing list above. Security bugs should be reported to [openssh@openssh.com](mailto:openssh.openssh.com).
