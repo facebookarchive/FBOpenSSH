@@ -22,10 +22,6 @@ The official documentation for OpenSSH are the man pages for each tool:
 * [ssh-keyscan(8)](https://man.openbsd.org/ssh-keyscan.8)
 * [sftp-server(8)](https://man.openbsd.org/sftp-server.8)
 
-## Stable Releases
-
-Stable release tarballs are available from a number of [download mirrors](https://www.openssh.com/portable.html#downloads). We recommend the use of a stable release for most users. Please read the [release notes](https://www.openssh.com/releasenotes.html) for details of recent changes and potential incompatibilities.
-
 ## Building Portable OpenSSH
 
 ### Dependencies
