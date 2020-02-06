@@ -1744,48 +1744,66 @@ The
 argument accepts one or more of the following keys
 .Pp
 .Bl -tag -width Ds -compact -offset indent
-.It Cm server_ip
-the local ip address of the host running sshd
-.sp
-.It Cm server_port
-the local port which sshd is listening on
-.sp
-.It Cm remote_ip
-the ip address of the remote host
-.sp
-.It Cm remote_port
-the port used by the remote host
-.sp
-.It Cm pid
-the process ID of sshd
-.sp
-.It Cm session_id
-the identifier associated with this session
-.sp
-.It Cm method
-the authentication method used
-.sp
-.It Cm user
-user id of session opener
-.sp
-.It Cm session_state
-state of the session, i.e. Session {opened,closed,failed}
+.It Cm auth_info
+Additional information about the authentication method (e.g. kerberos principal
+or certificate fingerprint).
 .sp
 .It Cm auth_successful
 \'true' if authentication was successful, otherwise 'false'
 .sp
-.It Cm start_time
-time since the epoch that the session was opened
+.It Cm cert_id
+The Key ID from the certificate, if a certificate was used to authenticate.
 .sp
-.It Cm end_time
-time since the epoch that the session was closed
+.It Cm cert_serial
+The serial number of the certificate used for authentication, if a certificate
+was used to authenticate.
+.sp
+.It Cm command
+The command run (non-interactive sessions only).
 .sp
 .It Cm duration
-duration of the session (end_time - start_time)
+The duration of the session in seconds (end_time - start_time)
 .sp
-.It Cm auth_info
-extra information about the authentication method (e.g. kerberos principal,
-certificate fingerprint).
+.It Cm end_time
+Seconds since the epoch that the session was closed
+.sp
+.It Cm method
+The authentication method used to open the session.
+.sp
+.It Cm pam_pid
+Contains the pid if the session was authorized with PAM.
+.sp
+.It Cm pid
+The process ID of sshd.
+.sp
+.It Cm principal
+The certificate principal used for authentication, if a certificate was used to
+authenticate.
+.sp
+.It Cm remote_ip
+The ip address of the remote host.
+.sp
+.It Cm remote_port
+The port used by the remote host.
+.sp
+.It Cm server_ip
+The local ip address of the host running sshd.
+.sp
+.It Cm server_port
+The local port which sshd is listening on.
+.sp
+.It Cm session_id
+The unique identifier associated with this session.
+.sp
+.It Cm session_state
+The state of the session, i.e. Session {opened,closed,failed}.
+.sp
+.It Cm start_time
+Seconds since the epoch that the session was opened
+.sp
+.It Cm user
+The user id used to open the session.
+.sp
 .El
 .sp
 .Sh TIME FORMATS
