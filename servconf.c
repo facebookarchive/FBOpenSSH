@@ -458,7 +458,6 @@ fill_default_server_options(ServerOptions *options)
 		CLEAR_ON_NONE(options->host_key_files[i]);
 	for (i = 0; i < options->num_host_cert_files; i++)
 		CLEAR_ON_NONE(options->host_cert_files[i]);
-#undef CLEAR_ON_NONE
 
 	/* Similar handling for AuthenticationMethods=any */
 	if (options->num_auth_methods == 1 &&
@@ -2384,6 +2383,11 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
 
+	CLEAR_ON_NONE(dst->banner);
+	CLEAR_ON_NONE(dst->trusted_user_ca_keys);
+	CLEAR_ON_NONE(dst->revoked_keys_file);
+	CLEAR_ON_NONE(dst->authorized_principals_file);
+
 	/* Arguments that accept '+...' need to be expanded */
 	assemble_algorithms(dst);
 
@@ -2406,7 +2410,7 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 		dst->chroot_directory = NULL;
 	}
 }
-
+#undef CLEAR_ON_NONE
 #undef M_CP_INTOPT
 #undef M_CP_STROPT
 #undef M_CP_STRARRAYOPT
