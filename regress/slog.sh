@@ -84,9 +84,12 @@ extract_key() {
 	last=$(echo "$loglines" | tail -n1)
 	json=${last:$(expr length $log_prefix)}
 
-	val=$(echo $json | python -c "import sys, json; print(json.load(sys.stdin)[\"$key\"])") ||
-	    fail "error extracting $key from $json"
-	echo "$val"
+	if val=$(echo $json | python -c "import sys, json; print(json.load(sys.stdin)[\"$key\"])"); then
+		echo "$val"
+	else
+		fail "error extracting $key from $json"
+		return 1
+	fi
 }
 
 test_basic_logging() {
@@ -130,6 +133,11 @@ test_cert_serial() {
 	 [ $serial = $logged_serial ] || fail 'cert serial mismatch'
 }
 
+test_client_version() {
+	client_version="$(extract_key 'client_version')" || fail 'no client version'
+	echo "$client_version" | grep -Eq '^OpenSSH' || fail 'invalid client version'
+}
+
 start_sshd
 
 keytype="RSA"
@@ -146,3 +154,4 @@ serial='42'
 make_cert "$princ" "$keytype" "$serial"
 test_auth_info "$keyfp" "$keytype" "$princ" "$serial"
 test_cert_serial "$serial"
+test_client_version
