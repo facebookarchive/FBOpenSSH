@@ -6,6 +6,7 @@ based on time in microseconds that applies to a sshd process and its children.
 - Output a structured log line when a session is opened, fails to open and is
 closed.  The log line contains various data about the session and can be
 configured by `LogFormatPrefix`, `LogFormatJson` and `LogFormatKeys`.
+- Include `client_version` in the log options.
 
 - Output a line in the logs whenever a local or remote tunnel is created.
 

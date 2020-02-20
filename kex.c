@@ -62,6 +62,14 @@
 #include "sshbuf.h"
 #include "digest.h"
 
+/* This function is defined in slog.h and is called only from sshd, but kex.h
+ * is included in other binaries that don't include slog.h, so we define this
+ * here as a weakref noop. If the linker can't find the function, this will
+ * be NULL. */
+void __attribute__((weak)) slog_set_client_version(const char *version) {
+    /* no-op */
+}
+
 /* prototype */
 static int kex_choose_conf(struct ssh *);
 static int kex_input_newkeys(int, u_int32_t, struct ssh *);
@@ -1317,6 +1325,9 @@ kex_exchange_identification(struct ssh *ssh, int timeout_ms,
 	}
 	debug("Remote protocol version %d.%d, remote software version %.100s",
 	    remote_major, remote_minor, remote_version);
+	if (slog_set_client_version)
+		slog_set_client_version(remote_version);
+
 	ssh->compat = compat_datafellows(remote_version);
 
 	mismatch = 0;
