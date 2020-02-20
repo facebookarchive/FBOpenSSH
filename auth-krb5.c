@@ -255,7 +255,7 @@ ssh_krb5_cc_gen(krb5_context ctx, krb5_ccache *ccache) {
 	}
 	snprintf(uid, sizeof(uid), "%d", geteuid());
 	snprintf(pid, sizeof(pid), "%ld", (long) getpid());
-	ccname = percent_expand(cctemplate, "u", uid, "p", pid);
+	ccname = percent_expand(cctemplate, "u", uid, "p", pid, (char*)NULL);
 	if (ccname == NULL) {
 		oerrno = ENOMEM;
 		goto out;
