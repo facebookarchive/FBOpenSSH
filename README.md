@@ -67,7 +67,7 @@ Flag | Meaning
 ``--with-selinux`` | Enable [SELinux](https://en.wikipedia.org/wiki/Security-Enhanced_Linux) support.
 
 ## Code of Conduct
-See the [CODE_OF_CONDUCT.md][CODE_OF_CONDUCT.md] file for details.
+See the [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) file for details.
 
 ## Contributors
 See the [CONTRIBUTING](CONTRIBUTING.md) file for how to help out.
