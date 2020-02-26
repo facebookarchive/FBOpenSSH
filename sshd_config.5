@@ -1744,6 +1744,9 @@ The
 argument accepts one or more of the following keys
 .Pp
 .Bl -tag -width Ds -compact -offset indent
+.It Cm auth_duration
+The authentication stage duration in seconds (double floating-point).
+.sp
 .It Cm auth_info
 Additional information about the authentication method (e.g. kerberos principal
 or certificate fingerprint).
@@ -1766,6 +1769,10 @@ The duration of the session in seconds (end_time - start_time)
 .sp
 .It Cm end_time
 Seconds since the epoch that the session was closed
+.sp
+.It Cm last_partial_auth_duration
+The time taken to reach the start of the last authentication factor stage in
+seconds (double floating-point).
 .sp
 .It Cm method
 The authentication method used to open the session.

@@ -43,6 +43,11 @@ struct Structuredlogctxt { /* items we care about logging */
 	pid_t		main_pid;		// main_pid
 	char		auth_info[SLOG_MEDIUM_STRING_LEN];		// auth_info
 	char		client_version[SLOG_STRING_LEN];		// client_version
+	struct timeval		auth_start_time;
+	struct timeval		last_partial_auth_time;
+	struct timeval		auth_end_time;
+	double		auth_duration;		// auth_duration
+	double		last_partial_auth_duration;		// last_partial_auth_duration
 };
 
 Structuredlogctxt *slogctxt;
@@ -70,6 +75,9 @@ static const char *duration_token          = "duration";
 static const char *main_pid_token          = "main_pid";
 static const char *auth_info_token         = "auth_info";
 static const char *client_version          = "client_version";
+static const char *auth_duration_token     = "auth_duration";
+static const char *last_partial_auth_duration_token	=	"last_partial_auth_duration";
+
 
 /* Example log format sshd_config
  * LogFormatPrefix sshd_auth_msg:
@@ -117,6 +125,38 @@ slog_pam_session_opened(void)
 	if (slogctxt != NULL) {
 		slogctxt->session_state = SLOG_SESSION_OPEN;
 		slogctxt->pam_process_pid = getpid();
+	}
+}
+
+void
+slog_set_auth_start(void)
+{
+	if (slogctxt != NULL) {
+		gettimeofday(&slogctxt->auth_start_time, NULL);
+	}
+}
+
+void
+slog_set_last_partial_auth_time(void)
+{
+	if (slogctxt != NULL) {
+		if (gettimeofday(&slogctxt->last_partial_auth_time, NULL) == 0) {
+			struct timeval res;
+			timersub(&slogctxt->last_partial_auth_time, &slogctxt->auth_start_time, &res);
+			slogctxt->last_partial_auth_duration = res.tv_sec + (res.tv_usec / 1000000.0);
+		}
+	}
+}
+
+void
+slog_set_auth_end(void)
+{
+	if (slogctxt != NULL) {
+		if (gettimeofday(&slogctxt->auth_end_time, NULL) == 0) {
+			struct timeval res;
+			timersub(&slogctxt->auth_end_time, &slogctxt->auth_start_time, &res);
+			slogctxt->auth_duration = res.tv_sec + (res.tv_usec / 1000000.0);
+		}
 	}
 }
 
@@ -579,6 +619,16 @@ slog_get_safe_from_token(char *output, const char *token)
 
 	if (strcmp(token, duration_token) == 0 && slogctxt->end_time > 0) {
 		snprintf(output, SLOG_SHORT_STRING_LEN, "\"%d\"", slogctxt->duration);
+		return;
+	}
+
+	if (strcmp(token, auth_duration_token) == 0 && slogctxt->auth_end_time.tv_sec > 0) {
+		snprintf(output, SLOG_SHORT_STRING_LEN, "\"%f\"", slogctxt->auth_duration);
+		return;
+	}
+
+	if (strcmp(token, last_partial_auth_duration_token) == 0 && timerisset(&slogctxt->last_partial_auth_time)) {
+		snprintf(output, SLOG_SHORT_STRING_LEN, "\"%f\"", slogctxt->last_partial_auth_duration);
 		return;
 	}
 

@@ -33,6 +33,9 @@ void	slog_set_principal(const char *);
 void	slog_set_user(const char *);
 void	slog_set_auth_info(const char *);
 void	slog_set_client_version(const char *);
+void	slog_set_auth_start(void);
+void	slog_set_auth_end(void);
+void	slog_set_last_partial_auth_time(void);
 
 // loggers
 void	slog_exit_handler(void);
