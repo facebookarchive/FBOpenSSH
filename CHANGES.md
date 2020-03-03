@@ -1,5 +1,7 @@
 # Changes
 
+## master
+
 - Add a session identifier to output messages.  This is a unique identifier
 based on time in microseconds that applies to a sshd process and its children.
 
@@ -26,3 +28,5 @@ and the user is authenticated by the certificate.
 config file.
 
 - Fix a bug where some options in `Match` clauses are not correctly `none`able.
+
+## V.8.0
