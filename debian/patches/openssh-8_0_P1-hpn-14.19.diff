@@ -1,6 +1,3 @@
-diff --git a/HPN-README b/HPN-README
-new file mode 100644
-index 00000000..31a949b8
 --- /dev/null
 +++ b/HPN-README
 @@ -0,0 +1,130 @@
@@ -134,8 +131,6 @@ index 00000000..31a949b8
 +         (tasota@gmail.com) an NSF REU grant recipient for 2013.
 +         This work was financed, in part, by Cisco System, Inc., the National
 +         Library of Medicine, and the National Science Foundation.
-diff --git a/Makefile.in b/Makefile.in
-index 6f001bb3..53c84b0f 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -42,7 +42,7 @@ CC=@CC@
@@ -156,8 +151,6 @@ index 6f001bb3..53c84b0f 100644
  	compat.o crc32.o fatal.o hostfile.o \
  	log.o match.o moduli.o nchan.o packet.o \
  	readpass.o ttymodes.o xmalloc.o addrmatch.o \
-diff --git a/auth2.c b/auth2.c
-index 16ae1a36..6175f852 100644
 --- a/auth2.c
 +++ b/auth2.c
 @@ -53,6 +53,7 @@
@@ -177,7 +170,7 @@ index 16ae1a36..6175f852 100644
  Authmethod *authmethods[] = {
  	&method_none,
  	&method_pubkey,
-@@ -277,6 +280,11 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
+@@ -280,6 +283,11 @@ input_userauth_request(int type, u_int32
  	    (r = sshpkt_get_cstring(ssh, &method, NULL)) != 0)
  		goto out;
  	debug("userauth-request for user %s service %s method %s", user, service, method);
@@ -188,9 +181,7 @@ index 16ae1a36..6175f852 100644
 +	}
  	debug("attempt %d failures %d", authctxt->attempt, authctxt->failures);
  
- 	if ((style = strchr(user, ':')) != NULL)
-diff --git a/canohost.h b/canohost.h
-index 26d62855..25b25992 100644
+ #ifdef WITH_SELINUX
 --- a/canohost.h
 +++ b/canohost.h
 @@ -19,7 +19,7 @@ char		*get_peer_ipaddr(int);
@@ -202,11 +193,9 @@ index 26d62855..25b25992 100644
  
  #endif /* _CANOHOST_H */
  
-diff --git a/channels.c b/channels.c
-index 657381b8..b52163bc 100644
 --- a/channels.c
 +++ b/channels.c
-@@ -220,6 +220,10 @@ static int rdynamic_connect_finish(struct ssh *, Channel *);
+@@ -220,6 +220,10 @@ static int rdynamic_connect_finish(struc
  /* Setup helper */
  static void channel_handler_init(struct ssh_channels *sc);
  
@@ -217,7 +206,7 @@ index 657381b8..b52163bc 100644
  /* -- channel core */
  
  void
-@@ -392,6 +396,7 @@ channel_new(struct ssh *ssh, char *ctype, int type, int rfd, int wfd, int efd,
+@@ -392,6 +396,7 @@ channel_new(struct ssh *ssh, char *ctype
  	c->local_window = window;
  	c->local_window_max = window;
  	c->local_maxpacket = maxpack;
@@ -225,7 +214,7 @@ index 657381b8..b52163bc 100644
  	c->remote_name = xstrdup(remote_name);
  	c->ctl_chan = -1;
  	c->delayed = 1;		/* prevent call to channel_post handler */
-@@ -1059,6 +1064,28 @@ channel_pre_connecting(struct ssh *ssh, Channel *c,
+@@ -1059,6 +1064,28 @@ channel_pre_connecting(struct ssh *ssh,
  	FD_SET(c->sock, writeset);
  }
  
@@ -254,7 +243,7 @@ index 657381b8..b52163bc 100644
  static void
  channel_pre_open(struct ssh *ssh, Channel *c,
      fd_set *readset, fd_set *writeset)
-@@ -2158,21 +2185,30 @@ channel_check_window(struct ssh *ssh, Channel *c)
+@@ -2158,21 +2185,30 @@ channel_check_window(struct ssh *ssh, Ch
  	    c->local_maxpacket*3) ||
  	    c->local_window < c->local_window_max/2) &&
  	    c->local_consumed > 0) {
@@ -288,7 +277,7 @@ index 657381b8..b52163bc 100644
  		c->local_consumed = 0;
  	}
  	return 1;
-@@ -2523,7 +2559,7 @@ channel_output_poll_input_open(struct ssh *ssh, Channel *c)
+@@ -2523,7 +2559,7 @@ channel_output_poll_input_open(struct ss
  	size_t len, plen;
  	const u_char *pkt;
  	int r;
@@ -297,7 +286,7 @@ index 657381b8..b52163bc 100644
  	if ((len = sshbuf_len(c->input)) == 0) {
  		if (c->istate == CHAN_INPUT_WAIT_DRAIN) {
  			/*
-@@ -2569,7 +2605,6 @@ channel_output_poll_input_open(struct ssh *ssh, Channel *c)
+@@ -2569,7 +2605,6 @@ channel_output_poll_input_open(struct ss
  			    c->self, ssh_err(r));
  		}
  		c->remote_window -= plen;
@@ -327,7 +316,7 @@ index 657381b8..b52163bc 100644
  		/* Get the amount of buffered data for this channel. */
  		if (c->istate == CHAN_INPUT_OPEN ||
  		    c->istate == CHAN_INPUT_WAIT_DRAIN)
-@@ -3354,6 +3389,15 @@ channel_fwd_bind_addr(struct ssh *ssh, const char *listen_addr, int *wildcardp,
+@@ -3354,6 +3389,15 @@ channel_fwd_bind_addr(struct ssh *ssh, c
  	return addr;
  }
  
@@ -343,7 +332,7 @@ index 657381b8..b52163bc 100644
  static int
  channel_setup_fwd_listener_tcpip(struct ssh *ssh, int type,
      struct Forward *fwd, int *allocated_listen_port,
-@@ -3494,9 +3538,11 @@ channel_setup_fwd_listener_tcpip(struct ssh *ssh, int type,
+@@ -3494,9 +3538,11 @@ channel_setup_fwd_listener_tcpip(struct
  		}
  
  		/* Allocate a channel number for the socket. */
@@ -357,7 +346,7 @@ index 657381b8..b52163bc 100644
  		c->path = xstrdup(host);
  		c->host_port = fwd->connect_port;
  		c->listening_addr = addr == NULL ? NULL : xstrdup(addr);
-@@ -4633,8 +4679,9 @@ x11_create_display_inet(struct ssh *ssh, int x11_display_offset,
+@@ -4648,8 +4694,9 @@ x11_create_display_inet(struct ssh *ssh,
  		sock = socks[n];
  		nc = channel_new(ssh, "x11 listener",
  		    SSH_CHANNEL_X11_LISTENER, sock, sock, -1,
@@ -369,8 +358,6 @@ index 657381b8..b52163bc 100644
  		nc->single_connection = single_connection;
  		(*chanids)[n] = nc->self;
  	}
-diff --git a/channels.h b/channels.h
-index aa2a87c1..0cb064e8 100644
 --- a/channels.h
 +++ b/channels.h
 @@ -150,6 +150,7 @@ struct Channel {
@@ -381,7 +368,7 @@ index aa2a87c1..0cb064e8 100644
  	int     extended_usage;
  	int	single_connection;
  
-@@ -341,4 +342,7 @@ void	 chan_rcvd_ieof(struct ssh *, Channel *);
+@@ -341,4 +342,7 @@ void	 chan_rcvd_ieof(struct ssh *, Chann
  void	 chan_write_failed(struct ssh *, Channel *);
  void	 chan_obuf_empty(struct ssh *, Channel *);
  
@@ -389,9 +376,6 @@ index aa2a87c1..0cb064e8 100644
 +void     channel_set_hpn(int, int);
 +
  #endif
-diff --git a/cipher-ctr-mt.c b/cipher-ctr-mt.c
-new file mode 100644
-index 00000000..71172f1b
 --- /dev/null
 +++ b/cipher-ctr-mt.c
 @@ -0,0 +1,679 @@
@@ -1074,8 +1058,6 @@ index 00000000..71172f1b
 +}
 +
 +#endif /* defined(WITH_OPENSSL) */
-diff --git a/cipher.c b/cipher.c
-index 12c59888..2ae8081f 100644
 --- a/cipher.c
 +++ b/cipher.c
 @@ -51,6 +51,8 @@
@@ -1087,8 +1069,8 @@ index 12c59888..2ae8081f 100644
  
  struct sshcipher_ctx {
  	int	plaintext;
-@@ -80,7 +82,7 @@ struct sshcipher {
- #endif
+@@ -61,7 +63,7 @@ struct sshcipher_ctx {
+ 	const struct sshcipher *cipher;
  };
  
 -static const struct sshcipher ciphers[] = {
@@ -1096,7 +1078,7 @@ index 12c59888..2ae8081f 100644
  #ifdef WITH_OPENSSL
  #ifndef OPENSSL_NO_DES
  	{ "3des-cbc",		8, 24, 0, 0, CFLAG_CBC, EVP_des_ede3_cbc },
-@@ -140,6 +142,29 @@ cipher_alg_list(char sep, int auth_only)
+@@ -121,6 +123,29 @@ cipher_alg_list(char sep, int auth_only)
  	return ret;
  }
  
@@ -1126,7 +1108,7 @@ index 12c59888..2ae8081f 100644
  u_int
  cipher_blocksize(const struct sshcipher *c)
  {
-@@ -189,10 +214,10 @@ cipher_ctx_is_plaintext(struct sshcipher_ctx *cc)
+@@ -170,10 +195,10 @@ cipher_ctx_is_plaintext(struct sshcipher
  	return cc->plaintext;
  }
  
@@ -1139,7 +1121,7 @@ index 12c59888..2ae8081f 100644
  	for (c = ciphers; c->name != NULL; c++)
  		if (strcmp(c->name, name) == 0)
  			return c;
-@@ -214,7 +239,8 @@ ciphers_valid(const char *names)
+@@ -195,7 +220,8 @@ ciphers_valid(const char *names)
  	for ((p = strsep(&cp, CIPHER_SEP)); p && *p != '\0';
  	    (p = strsep(&cp, CIPHER_SEP))) {
  		c = cipher_by_name(p);
@@ -1149,12 +1131,10 @@ index 12c59888..2ae8081f 100644
  			free(cipher_list);
  			return 0;
  		}
-diff --git a/cipher.h b/cipher.h
-index dc1571d2..610f94d5 100644
 --- a/cipher.h
 +++ b/cipher.h
-@@ -48,7 +48,9 @@
- struct sshcipher;
+@@ -66,7 +66,9 @@ struct sshcipher {
+ 
  struct sshcipher_ctx;
  
 -const struct sshcipher *cipher_by_name(const char *);
@@ -1164,7 +1144,7 @@ index dc1571d2..610f94d5 100644
  const char *cipher_warning_message(const struct sshcipher_ctx *);
  int	 ciphers_valid(const char *);
  char	*cipher_alg_list(char, int);
-@@ -65,6 +67,8 @@ u_int	 cipher_seclen(const struct sshcipher *);
+@@ -83,6 +85,8 @@ u_int	 cipher_seclen(const struct sshcip
  u_int	 cipher_authlen(const struct sshcipher *);
  u_int	 cipher_ivlen(const struct sshcipher *);
  u_int	 cipher_is_cbc(const struct sshcipher *);
@@ -1173,11 +1153,9 @@ index dc1571d2..610f94d5 100644
  
  u_int	 cipher_ctx_is_plaintext(struct sshcipher_ctx *);
  
-diff --git a/clientloop.c b/clientloop.c
-index 086c0dfe..ebe7afdb 100644
 --- a/clientloop.c
 +++ b/clientloop.c
-@@ -1600,9 +1600,11 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
+@@ -1600,9 +1600,11 @@ client_request_x11(struct ssh *ssh, cons
  	sock = x11_connect_display(ssh);
  	if (sock < 0)
  		return NULL;
@@ -1192,7 +1170,7 @@ index 086c0dfe..ebe7afdb 100644
  	c->force_drain = 1;
  	return c;
  }
-@@ -1626,9 +1628,10 @@ client_request_agent(struct ssh *ssh, const char *request_type, int rchan)
+@@ -1626,9 +1628,10 @@ client_request_agent(struct ssh *ssh, co
  		return NULL;
  	}
  	c = channel_new(ssh, "authentication agent connection",
@@ -1206,7 +1184,7 @@ index 086c0dfe..ebe7afdb 100644
  	c->force_drain = 1;
  	return c;
  }
-@@ -1653,10 +1656,13 @@ client_request_tun_fwd(struct ssh *ssh, int tun_mode,
+@@ -1653,10 +1656,13 @@ client_request_tun_fwd(struct ssh *ssh,
  	}
  	debug("Tunnel forwarding using interface %s", ifname);
  
@@ -1222,8 +1200,6 @@ index 086c0dfe..ebe7afdb 100644
  #if defined(SSH_TUN_FILTER)
  	if (options.tun_open == SSH_TUNMODE_POINTOPOINT)
  		channel_register_filter(ssh, c->self, sys_tun_infilter,
-diff --git a/compat.c b/compat.c
-index 0624dc6d..c4aee493 100644
 --- a/compat.c
 +++ b/compat.c
 @@ -150,6 +150,13 @@ compat_datafellows(const char *version)
@@ -1240,8 +1216,6 @@ index 0624dc6d..c4aee493 100644
  			return check[i].bugs;
  		}
  	}
-diff --git a/compat.h b/compat.h
-index d611d33e..2c5b2f9e 100644
 --- a/compat.h
 +++ b/compat.h
 @@ -62,6 +62,7 @@
@@ -1252,19 +1226,17 @@ index d611d33e..2c5b2f9e 100644
  
  u_int    compat_datafellows(const char *);
  int	 proto_spec(const char *);
-diff --git a/kex.c b/kex.c
-index 34808b5c..fd6430f3 100644
 --- a/kex.c
 +++ b/kex.c
-@@ -58,6 +58,7 @@
+@@ -61,6 +61,7 @@
  
  #include "ssherr.h"
  #include "sshbuf.h"
 +#include "canohost.h"
  #include "digest.h"
+ #include "audit.h"
  
- /* prototype */
-@@ -837,6 +838,11 @@ kex_choose_conf(struct ssh *ssh)
+@@ -861,6 +862,11 @@ kex_choose_conf(struct ssh *ssh)
  	int nenc, nmac, ncomp;
  	u_int mode, ctos, need, dh_need, authlen;
  	int r, first_kex_follows;
@@ -1276,7 +1248,7 @@ index 34808b5c..fd6430f3 100644
  
  	debug2("local %s KEXINIT proposal", kex->server ? "server" : "client");
  	if ((r = kex_buf2prop(kex->my, NULL, &my)) != 0)
-@@ -907,11 +913,35 @@ kex_choose_conf(struct ssh *ssh)
+@@ -931,11 +937,35 @@ kex_choose_conf(struct ssh *ssh)
  			peer[ncomp] = NULL;
  			goto out;
  		}
@@ -1312,7 +1284,7 @@ index 34808b5c..fd6430f3 100644
  	}
  	need = dh_need = 0;
  	for (mode = 0; mode < MODE_MAX; mode++) {
-@@ -1260,6 +1290,11 @@ kex_exchange_identification(struct ssh *ssh, int timeout_ms,
+@@ -1408,6 +1438,11 @@ kex_exchange_identification(struct ssh *
  		r = SSH_ERR_INVALID_FORMAT;
  		goto out;
  	}
@@ -1323,12 +1295,10 @@ index 34808b5c..fd6430f3 100644
 +	
  	debug("Remote protocol version %d.%d, remote software version %.100s",
  	    remote_major, remote_minor, remote_version);
- 	ssh->compat = compat_datafellows(remote_version);
-diff --git a/packet.c b/packet.c
-index 36e352b4..82b9c67b 100644
+ 	if (slog_set_client_version)
 --- a/packet.c
 +++ b/packet.c
-@@ -287,7 +287,7 @@ struct ssh *
+@@ -288,7 +288,7 @@ struct ssh *
  ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
  {
  	struct session_state *state;
@@ -1337,7 +1307,7 @@ index 36e352b4..82b9c67b 100644
  	int r;
  
  	if (none == NULL) {
-@@ -926,6 +926,24 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
+@@ -942,6 +942,24 @@ ssh_set_newkeys(struct ssh *ssh, int mod
  	return 0;
  }
  
@@ -1362,7 +1332,7 @@ index 36e352b4..82b9c67b 100644
  #define MAX_PACKETS	(1U<<31)
  static int
  ssh_packet_need_rekeying(struct ssh *ssh, u_int outbound_packet_len)
-@@ -952,6 +970,13 @@ ssh_packet_need_rekeying(struct ssh *ssh, u_int outbound_packet_len)
+@@ -968,6 +986,13 @@ ssh_packet_need_rekeying(struct ssh *ssh
  	if (state->p_send.packets == 0 && state->p_read.packets == 0)
  		return 0;
  
@@ -1376,7 +1346,7 @@ index 36e352b4..82b9c67b 100644
  	/* Time-based rekeying */
  	if (state->rekey_interval != 0 &&
  	    (int64_t)state->rekey_time + state->rekey_interval <= monotime())
-@@ -1821,17 +1846,21 @@ sshpkt_vfatal(struct ssh *ssh, int r, const char *fmt, va_list ap)
+@@ -1837,17 +1862,21 @@ sshpkt_vfatal(struct ssh *ssh, int r, co
  	switch (r) {
  	case SSH_ERR_CONN_CLOSED:
  		ssh_packet_clear_keys(ssh);
@@ -1398,7 +1368,7 @@ index 36e352b4..82b9c67b 100644
  			logdie("Connection reset by %s", remote_id);
  		}
  		/* FALLTHROUGH */
-@@ -1873,6 +1902,24 @@ sshpkt_fatal(struct ssh *ssh, int r, const char *fmt, ...)
+@@ -1889,6 +1918,24 @@ sshpkt_fatal(struct ssh *ssh, int r, con
  	logdie("%s: should have exited", __func__);
  }
  
@@ -1423,7 +1393,7 @@ index 36e352b4..82b9c67b 100644
  /*
   * Logs the error plus constructs and sends a disconnect packet, closes the
   * connection, and exits.  This function never returns. The error message
-@@ -1942,6 +1989,8 @@ ssh_packet_write_poll(struct ssh *ssh)
+@@ -1958,6 +2005,8 @@ ssh_packet_write_poll(struct ssh *ssh)
  			return SSH_ERR_CONN_CLOSED;
  		if ((r = sshbuf_consume(state->output, len)) != 0)
  			return r;
@@ -1432,7 +1402,7 @@ index 36e352b4..82b9c67b 100644
  	}
  	return 0;
  }
-@@ -2702,3 +2751,10 @@ sshpkt_add_padding(struct ssh *ssh, u_char pad)
+@@ -2783,3 +2832,10 @@ sshpkt_add_padding(struct ssh *ssh, u_ch
  	ssh->state->extra_pad = pad;
  	return 0;
  }
@@ -1443,8 +1413,6 @@ index 36e352b4..82b9c67b 100644
 +{
 +        return ssh->state->send_context;
 +}
-diff --git a/packet.h b/packet.h
-index 0dfa36da..c04a756a 100644
 --- a/packet.h
 +++ b/packet.h
 @@ -86,6 +86,11 @@ struct ssh {
@@ -1459,7 +1427,7 @@ index 0dfa36da..c04a756a 100644
  };
  
  typedef int (ssh_packet_hook_fn)(struct ssh *, struct sshbuf *,
-@@ -155,6 +160,8 @@ int	 ssh_packet_inc_alive_timeouts(struct ssh *);
+@@ -155,6 +160,8 @@ int	 ssh_packet_inc_alive_timeouts(struc
  int	 ssh_packet_set_maxsize(struct ssh *, u_int);
  u_int	 ssh_packet_get_maxsize(struct ssh *);
  
@@ -1468,7 +1436,7 @@ index 0dfa36da..c04a756a 100644
  int	 ssh_packet_get_state(struct ssh *, struct sshbuf *);
  int	 ssh_packet_set_state(struct ssh *, struct sshbuf *);
  
-@@ -169,6 +176,13 @@ time_t	 ssh_packet_get_rekey_timeout(struct ssh *);
+@@ -169,6 +176,13 @@ time_t	 ssh_packet_get_rekey_timeout(str
  
  void	*ssh_packet_get_input(struct ssh *);
  void	*ssh_packet_get_output(struct ssh *);
@@ -1482,11 +1450,9 @@ index 0dfa36da..c04a756a 100644
  
  /* new API */
  int	sshpkt_start(struct ssh *ssh, u_char type);
-diff --git a/progressmeter.c b/progressmeter.c
-index e385c125..6b625dac 100644
 --- a/progressmeter.c
 +++ b/progressmeter.c
-@@ -68,6 +68,8 @@ static const char *file;	/* name of the file being transferred */
+@@ -68,6 +68,8 @@ static const char *file;	/* name of the
  static off_t start_pos;		/* initial position of transfer */
  static off_t end_pos;		/* ending position of transfer */
  static off_t cur_pos;		/* transfer position as of last refresh */
@@ -1547,8 +1513,6 @@ index e385c125..6b625dac 100644
  }
  
  /*ARGSUSED*/
-diff --git a/readconf.c b/readconf.c
-index ec497e79..40faa018 100644
 --- a/readconf.c
 +++ b/readconf.c
 @@ -67,6 +67,7 @@
@@ -1692,8 +1656,6 @@ index ec497e79..40faa018 100644
  	if (options->control_master == -1)
  		options->control_master = 0;
  	if (options->control_persist == -1) {
-diff --git a/readconf.h b/readconf.h
-index 8e36bf32..56df66ed 100644
 --- a/readconf.h
 +++ b/readconf.h
 @@ -50,6 +50,10 @@ typedef struct {
@@ -1719,11 +1681,9 @@ index 8e36bf32..56df66ed 100644
  	int	no_host_authentication_for_localhost;
  	int	identities_only;
  	int	server_alive_interval;
-diff --git a/sandbox-seccomp-filter.c b/sandbox-seccomp-filter.c
-index 5edbc694..a066319b 100644
 --- a/sandbox-seccomp-filter.c
 +++ b/sandbox-seccomp-filter.c
-@@ -175,6 +175,9 @@ static const struct sock_filter preauth_insns[] = {
+@@ -178,6 +178,9 @@ static const struct sock_filter preauth_
  #ifdef __NR_geteuid32
  	SC_ALLOW(__NR_geteuid32),
  #endif
@@ -1733,11 +1693,9 @@ index 5edbc694..a066319b 100644
  #ifdef __NR_getpgid
  	SC_ALLOW(__NR_getpgid),
  #endif
-diff --git a/scp.c b/scp.c
-index 80bc0e8b..17510e90 100644
 --- a/scp.c
 +++ b/scp.c
-@@ -1066,7 +1066,7 @@ source(int argc, char **argv)
+@@ -1071,7 +1071,7 @@ source(int argc, char **argv)
  	off_t i, statbytes;
  	size_t amt, nr;
  	int fd = -1, haderr, indx;
@@ -1746,7 +1704,7 @@ index 80bc0e8b..17510e90 100644
  	int len;
  
  	for (indx = 0; indx < argc; ++indx) {
-@@ -1239,7 +1239,7 @@ sink(int argc, char **argv, const char *src)
+@@ -1244,7 +1244,7 @@ sink(int argc, char **argv, const char *
  	off_t size, statbytes;
  	unsigned long long ull;
  	int setimes, targisdir, wrerrno = 0;
@@ -1755,8 +1713,6 @@ index 80bc0e8b..17510e90 100644
  	char **patterns = NULL;
  	size_t n, npatterns = 0;
  	struct timeval tv[2];
-diff --git a/servconf.c b/servconf.c
-index ffac5d2c..da214798 100644
 --- a/servconf.c
 +++ b/servconf.c
 @@ -64,6 +64,7 @@
@@ -1767,7 +1723,7 @@ index ffac5d2c..da214798 100644
  
  static void add_listen_addr(ServerOptions *, const char *,
      const char *, int);
-@@ -174,6 +175,11 @@ initialize_server_options(ServerOptions *options)
+@@ -175,6 +176,11 @@ initialize_server_options(ServerOptions
  	options->authorized_principals_file = NULL;
  	options->authorized_principals_command = NULL;
  	options->authorized_principals_command_user = NULL;
@@ -1779,7 +1735,7 @@ index ffac5d2c..da214798 100644
  	options->ip_qos_interactive = -1;
  	options->ip_qos_bulk = -1;
  	options->version_addendum = NULL;
-@@ -273,6 +279,10 @@ void
+@@ -278,6 +284,10 @@ void
  fill_default_server_options(ServerOptions *options)
  {
  	u_int i;
@@ -1790,7 +1746,7 @@ index ffac5d2c..da214798 100644
  
  	/* Portable-specific options */
  	if (options->use_pam == -1)
-@@ -409,6 +419,45 @@ fill_default_server_options(ServerOptions *options)
+@@ -416,6 +426,45 @@ fill_default_server_options(ServerOption
  	}
  	if (options->permit_tun == -1)
  		options->permit_tun = SSH_TUNMODE_NO;
@@ -1836,17 +1792,17 @@ index ffac5d2c..da214798 100644
  	if (options->ip_qos_interactive == -1)
  		options->ip_qos_interactive = IPTOS_DSCP_AF21;
  	if (options->ip_qos_bulk == -1)
-@@ -486,6 +535,9 @@ typedef enum {
+@@ -494,6 +543,9 @@ typedef enum {
  	sPasswordAuthentication, sKbdInteractiveAuthentication,
  	sListenAddress, sAddressFamily,
  	sPrintMotd, sPrintLastLog, sIgnoreRhosts,
-+	sNoneEnabled,
++        sNoneEnabled,
 +	sDisableMTAES,
 +	sTcpRcvBufPoll, sHPNDisabled, sHPNBufferSize,
- 	sX11Forwarding, sX11DisplayOffset, sX11UseLocalhost,
+ 	sX11Forwarding, sX11DisplayOffset, sX11MaxDisplays, sX11UseLocalhost,
  	sPermitTTY, sStrictModes, sEmptyPasswd, sTCPKeepAlive,
  	sPermitUserEnvironment, sAllowTcpForwarding, sCompression,
-@@ -642,6 +694,11 @@ static struct {
+@@ -655,6 +707,11 @@ static struct {
  	{ "revokedkeys", sRevokedKeys, SSHCFG_ALL },
  	{ "trustedusercakeys", sTrustedUserCAKeys, SSHCFG_ALL },
  	{ "authorizedprincipalsfile", sAuthorizedPrincipalsFile, SSHCFG_ALL },
@@ -1858,7 +1814,7 @@ index ffac5d2c..da214798 100644
  	{ "kexalgorithms", sKexAlgorithms, SSHCFG_GLOBAL },
  	{ "ipqos", sIPQoS, SSHCFG_ALL },
  	{ "authorizedkeyscommand", sAuthorizedKeysCommand, SSHCFG_ALL },
-@@ -698,6 +755,7 @@ parse_token(const char *cp, const char *filename,
+@@ -715,6 +772,7 @@ parse_token(const char *cp, const char *
  
  	for (i = 0; keywords[i].name; i++)
  		if (strcasecmp(cp, keywords[i].name) == 0) {
@@ -1866,7 +1822,7 @@ index ffac5d2c..da214798 100644
  			*flags = keywords[i].flags;
  			return keywords[i].opcode;
  		}
-@@ -1422,10 +1480,31 @@ process_server_config_line(ServerOptions *options, char *line,
+@@ -1439,10 +1497,31 @@ process_server_config_line(ServerOptions
  		multistate_ptr = multistate_flag;
  		goto parse_multistate;
  
@@ -1898,11 +1854,9 @@ index ffac5d2c..da214798 100644
  	case sHostbasedAuthentication:
  		intptr = &options->hostbased_authentication;
  		goto parse_flag;
-diff --git a/servconf.h b/servconf.h
-index 54e0a8d8..3ad2537d 100644
 --- a/servconf.h
 +++ b/servconf.h
-@@ -183,6 +183,13 @@ typedef struct {
+@@ -187,6 +187,13 @@ typedef struct {
  	char   *adm_forced_command;
  
  	int	use_pam;		/* Enable auth via PAM */
@@ -1916,11 +1870,9 @@ index 54e0a8d8..3ad2537d 100644
  
  	int	permit_tun;
  
-diff --git a/serverloop.c b/serverloop.c
-index d7b04b37..1f2859e9 100644
 --- a/serverloop.c
 +++ b/serverloop.c
-@@ -343,6 +343,7 @@ process_input(struct ssh *ssh, fd_set *readset, int connection_in)
+@@ -343,6 +343,7 @@ process_input(struct ssh *ssh, fd_set *r
  			    != 0)
  				fatal("%s: ssh_packet_process_incoming: %s",
  				    __func__, ssh_err(r));
@@ -1928,7 +1880,7 @@ index d7b04b37..1f2859e9 100644
  		}
  	}
  	return 0;
-@@ -401,6 +402,7 @@ server_loop2(struct ssh *ssh, Authctxt *authctxt)
+@@ -401,6 +402,7 @@ server_loop2(struct ssh *ssh, Authctxt *
  	u_int64_t rekey_timeout_ms = 0;
  
  	debug("Entering interactive session for SSH2.");
@@ -1936,7 +1888,7 @@ index d7b04b37..1f2859e9 100644
  
  	signal(SIGCHLD, sigchld_handler);
  	child_terminated = 0;
-@@ -439,6 +441,7 @@ server_loop2(struct ssh *ssh, Authctxt *authctxt)
+@@ -439,6 +441,7 @@ server_loop2(struct ssh *ssh, Authctxt *
  
  		if (received_sigterm) {
  			logit("Exiting on signal %d", (int)received_sigterm);
@@ -1944,7 +1896,7 @@ index d7b04b37..1f2859e9 100644
  			/* Clean up sessions, utmp, etc. */
  			cleanup_exit(255);
  		}
-@@ -458,6 +461,9 @@ server_loop2(struct ssh *ssh, Authctxt *authctxt)
+@@ -458,6 +461,9 @@ server_loop2(struct ssh *ssh, Authctxt *
  	/* free all channels, no more reads and writes */
  	channel_free_all(ssh);
  
@@ -1954,7 +1906,7 @@ index d7b04b37..1f2859e9 100644
  	/* free remaining sessions, e.g. remove wtmp entries */
  	session_destroy_all(ssh, NULL);
  }
-@@ -608,7 +614,8 @@ server_request_tun(struct ssh *ssh)
+@@ -614,7 +620,8 @@ server_request_tun(struct ssh *ssh)
  	debug("Tunnel forwarding using interface %s", ifname);
  
  	c = channel_new(ssh, "tun", SSH_CHANNEL_OPEN, sock, sock, -1,
@@ -1964,7 +1916,7 @@ index d7b04b37..1f2859e9 100644
  	c->datagram = 1;
  #if defined(SSH_TUN_FILTER)
  	if (mode == SSH_TUNMODE_POINTOPOINT)
-@@ -659,6 +666,8 @@ server_request_session(struct ssh *ssh)
+@@ -665,6 +672,8 @@ server_request_session(struct ssh *ssh)
  	c = channel_new(ssh, "session", SSH_CHANNEL_LARVAL,
  	    -1, -1, -1, /*window size*/0, CHAN_SES_PACKET_DEFAULT,
  	    0, "server-session", 1);
@@ -1973,11 +1925,9 @@ index d7b04b37..1f2859e9 100644
  	if (session_open(the_authctxt, c->self) != 1) {
  		debug("session open failed, free channel %d", c->self);
  		channel_free(ssh, c);
-diff --git a/session.c b/session.c
-index ac06b08e..66633cd1 100644
 --- a/session.c
 +++ b/session.c
-@@ -223,6 +223,7 @@ auth_input_request_forwarding(struct ssh *ssh, struct passwd * pw)
+@@ -231,6 +231,7 @@ auth_input_request_forwarding(struct ssh
  		goto authsock_err;
  
  	/* Allocate a channel for the authentication agent socket. */
@@ -1985,7 +1935,7 @@ index ac06b08e..66633cd1 100644
  	nc = channel_new(ssh, "auth socket",
  	    SSH_CHANNEL_AUTH_SOCKET, sock, sock, -1,
  	    CHAN_X11_WINDOW_DEFAULT, CHAN_X11_PACKET_DEFAULT,
-@@ -2251,10 +2252,11 @@ session_set_fds(struct ssh *ssh, Session *s,
+@@ -2400,10 +2401,11 @@ session_set_fds(struct ssh *ssh, Session
  	 */
  	if (s->chanid == -1)
  		fatal("no channel for session %d", s->self);
@@ -2001,8 +1951,6 @@ index ac06b08e..66633cd1 100644
  }
  
  /*
-diff --git a/sftp.1 b/sftp.1
-index 25909588..9a65797c 100644
 --- a/sftp.1
 +++ b/sftp.1
 @@ -286,7 +286,8 @@ diagnostic messages from
@@ -2015,8 +1963,6 @@ index 25909588..9a65797c 100644
  .It Fl r
  Recursively copy entire directories when uploading and downloading.
  Note that
-diff --git a/sftp.c b/sftp.c
-index 44aa19d9..8ee7db4d 100644
 --- a/sftp.c
 +++ b/sftp.c
 @@ -72,7 +72,7 @@ typedef void EditLine;
@@ -2028,11 +1974,9 @@ index 44aa19d9..8ee7db4d 100644
  
  /* File to read commands from */
  FILE* infile;
-diff --git a/ssh.c b/ssh.c
-index 91e7c351..f3c76ab3 100644
 --- a/ssh.c
 +++ b/ssh.c
-@@ -957,6 +957,10 @@ main(int ac, char **av)
+@@ -965,6 +965,10 @@ main(int ac, char **av)
  			break;
  		case 'T':
  			options.request_tty = REQUEST_TTY_NO;
@@ -2043,7 +1987,7 @@ index 91e7c351..f3c76ab3 100644
  			break;
  		case 'o':
  			line = xstrdup(optarg);
-@@ -1582,6 +1586,8 @@ control_persist_detach(void)
+@@ -1591,6 +1595,8 @@ control_persist_detach(void)
  	setproctitle("%s [mux]", options.control_path);
  }
  
@@ -2052,7 +1996,7 @@ index 91e7c351..f3c76ab3 100644
  /* Do fork() after authentication. Used by "ssh -f" */
  static void
  fork_postauth(void)
-@@ -1825,6 +1831,78 @@ ssh_session2_setup(struct ssh *ssh, int id, int success, void *arg)
+@@ -1834,6 +1840,78 @@ ssh_session2_setup(struct ssh *ssh, int
  	    NULL, fileno(stdin), command, environ);
  }
  
@@ -2131,7 +2075,7 @@ index 91e7c351..f3c76ab3 100644
  /* open new channel for a session */
  static int
  ssh_session2_open(struct ssh *ssh)
-@@ -1851,9 +1929,11 @@ ssh_session2_open(struct ssh *ssh)
+@@ -1860,9 +1938,11 @@ ssh_session2_open(struct ssh *ssh)
  	if (!isatty(err))
  		set_nonblock(err);
  
@@ -2144,7 +2088,7 @@ index 91e7c351..f3c76ab3 100644
  		window >>= 1;
  		packetmax >>= 1;
  	}
-@@ -1862,6 +1942,10 @@ ssh_session2_open(struct ssh *ssh)
+@@ -1871,6 +1951,10 @@ ssh_session2_open(struct ssh *ssh)
  	    window, packetmax, CHAN_EXTENDED_WRITE,
  	    "client-session", /*nonblock*/0);
  
@@ -2155,7 +2099,7 @@ index 91e7c351..f3c76ab3 100644
  	debug3("%s: channel_new: %d", __func__, c->self);
  
  	channel_send_open(ssh, c->self);
-@@ -1878,6 +1962,13 @@ ssh_session2(struct ssh *ssh, struct passwd *pw)
+@@ -1887,6 +1971,13 @@ ssh_session2(struct ssh *ssh, struct pas
  	int r, devnull, id = -1;
  	char *cp, *tun_fwd_ifname = NULL;
  
@@ -2169,8 +2113,6 @@ index 91e7c351..f3c76ab3 100644
  	/* XXX should be pre-session */
  	if (!options.control_persist)
  		ssh_init_stdio_forwarding(ssh);
-diff --git a/sshbuf.h b/sshbuf.h
-index 7900b82b..0425891d 100644
 --- a/sshbuf.h
 +++ b/sshbuf.h
 @@ -28,7 +28,7 @@
@@ -2182,15 +2124,12 @@ index 7900b82b..0425891d 100644
  #define SSHBUF_REFS_MAX		0x100000	/* Max child buffers */
  #define SSHBUF_MAX_BIGNUM	(16384 / 8)	/* Max bignum *bytes* */
  #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
-diff --git a/sshconnect.c b/sshconnect.c
-index fdcdcd85..a73cbcec 100644
 --- a/sshconnect.c
 +++ b/sshconnect.c
-@@ -355,6 +355,31 @@ check_ifaddrs(const char *ifname, int af, const struct ifaddrs *ifaddrs,
- }
+@@ -356,6 +356,31 @@ check_ifaddrs(const char *ifname, int af
  #endif
  
-+/*
+ /*
 + * Set TCP receive buffer if requested.
 + * Note: tuning needs to happen after the socket is
 + * created but before the connection happens
@@ -2215,9 +2154,10 @@ index fdcdcd85..a73cbcec 100644
 +}
 +
 +
- /*
++/*
   * Creates a socket for use as the ssh connection.
   */
+ static int
 @@ -377,6 +402,9 @@ ssh_create_socket(struct addrinfo *ai)
  	}
  	fcntl(sock, F_SETFD, FD_CLOEXEC);
@@ -2228,25 +2168,23 @@ index fdcdcd85..a73cbcec 100644
  	/* Bind the socket to an alternative local IP address */
  	if (options.bind_address == NULL && options.bind_interface == NULL)
  		return sock;
-diff --git a/sshconnect2.c b/sshconnect2.c
-index dffee90b..87feb19a 100644
 --- a/sshconnect2.c
 +++ b/sshconnect2.c
-@@ -82,6 +82,13 @@ extern char *client_version_string;
- extern char *server_version_string;
+@@ -83,6 +83,13 @@ extern char *server_version_string;
  extern Options options;
  
-+/*
+ /*
 + * tty_flag is set in ssh.c. Use this in ssh_userauth2:
 + * if it is set, then prevent the switch to the null cipher.
 + */
 +
 +extern int tty_flag;
 +
- /*
++/*
   * SSH2 key exchange
   */
-@@ -154,6 +161,8 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
+ 
+@@ -154,6 +161,8 @@ order_hostkeyalgs(char *host, struct soc
  	return ret;
  }
  
@@ -2255,7 +2193,7 @@ index dffee90b..87feb19a 100644
  void
  ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
  {
-@@ -161,6 +170,8 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
+@@ -161,6 +170,8 @@ ssh_kex2(struct ssh *ssh, char *host, st
  	char *s, *all_key;
  	int r;
  
@@ -2264,7 +2202,7 @@ index dffee90b..87feb19a 100644
  	xxx_host = host;
  	xxx_hostaddr = hostaddr;
  
-@@ -422,6 +433,47 @@ ssh_userauth2(struct ssh *ssh, const char *local_user,
+@@ -422,6 +433,47 @@ ssh_userauth2(struct ssh *ssh, const cha
  
  	if (!authctxt.success)
  		fatal("Authentication failed.");
@@ -2312,11 +2250,9 @@ index dffee90b..87feb19a 100644
  	debug("Authentication succeeded (%s).", authctxt.method->name);
  }
  
-diff --git a/sshd.c b/sshd.c
-index cbd3bce9..726bfda0 100644
 --- a/sshd.c
 +++ b/sshd.c
-@@ -374,6 +374,8 @@ grace_alarm_handler(int sig)
+@@ -391,6 +391,8 @@ grace_alarm_handler(int sig)
  	sigdie("Timeout before authentication for %s port %d",
  	    ssh_remote_ipaddr(the_active_state),
  	    ssh_remote_port(the_active_state));
@@ -2324,8 +2260,8 @@ index cbd3bce9..726bfda0 100644
 +
  }
  
- /* Destroy the host and server keys.  They will no longer be needed. */
-@@ -950,6 +952,8 @@ listen_on_addrs(struct listenaddr *la)
+ /*
+@@ -1026,6 +1028,8 @@ listen_on_addrs(struct listenaddr *la)
  	int ret, listen_sock;
  	struct addrinfo *ai;
  	char ntop[NI_MAXHOST], strport[NI_MAXSERV];
@@ -2334,7 +2270,7 @@ index cbd3bce9..726bfda0 100644
  
  	for (ai = la->addrs; ai; ai = ai->ai_next) {
  		if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6)
-@@ -995,6 +999,11 @@ listen_on_addrs(struct listenaddr *la)
+@@ -1071,6 +1075,11 @@ listen_on_addrs(struct listenaddr *la)
  
  		debug("Bind to port %s on %s.", strport, ntop);
  
@@ -2346,7 +2282,7 @@ index cbd3bce9..726bfda0 100644
  		/* Bind the socket to the desired port. */
  		if (bind(listen_sock, ai->ai_addr, ai->ai_addrlen) < 0) {
  			error("Bind to port %s on %s failed: %.200s.",
-@@ -1638,6 +1647,13 @@ main(int ac, char **av)
+@@ -1739,6 +1748,13 @@ main(int ac, char **av)
  	/* Fill in default values for those options not explicitly set. */
  	fill_default_server_options(&options);
  
@@ -2360,17 +2296,17 @@ index cbd3bce9..726bfda0 100644
  	/* challenge-response is implemented via keyboard interactive */
  	if (options.challenge_response_authentication)
  		options.kbd_interactive_authentication = 1;
-@@ -2064,6 +2080,9 @@ main(int ac, char **av)
- 	    rdomain == NULL ? "" : "\"");
- 	free(laddr);
+@@ -2149,6 +2165,9 @@ main(int ac, char **av)
+ 	if (options.routing_domain != NULL)
+ 		set_process_rdomain(ssh, options.routing_domain);
  
 +	/* set the HPN options for the child */
 +	channel_set_hpn(options.hpn_disabled, options.hpn_buffer_size);
 +
  	/*
- 	 * We don't want to listen forever unless the other side
- 	 * successfully authenticates itself.  So we set up an alarm which is
-@@ -2170,6 +2189,25 @@ main(int ac, char **av)
+ 	 * The rest of the code depends on the fact that
+ 	 * ssh_remote_ipaddr() caches the remote ip, even if
+@@ -2287,6 +2306,25 @@ main(int ac, char **av)
  	/* Try to send all our hostkeys to the client */
  	notify_hostkeys(ssh);
  
@@ -2396,7 +2332,7 @@ index cbd3bce9..726bfda0 100644
  	/* Start session. */
  	do_authenticated(ssh, authctxt);
  
-@@ -2239,6 +2277,9 @@ do_ssh2_kex(struct ssh *ssh)
+@@ -2359,6 +2397,9 @@ do_ssh2_kex(struct ssh *ssh)
  	struct kex *kex;
  	int r;
  
@@ -2406,11 +2342,9 @@ index cbd3bce9..726bfda0 100644
  	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
  	    options.kex_algorithms);
  	myproposal[PROPOSAL_ENC_ALGS_CTOS] = compat_cipher_proposal(
-diff --git a/sshd_config b/sshd_config
-index 19b7c91a..64dcb9a6 100644
 --- a/sshd_config
 +++ b/sshd_config
-@@ -108,6 +108,19 @@ AuthorizedKeysFile	.ssh/authorized_keys
+@@ -120,6 +120,19 @@ AuthorizedKeysFile	.ssh/authorized_keys
  # override default of no subsystems
  Subsystem	sftp	/usr/libexec/sftp-server
  
@@ -2430,8 +2364,6 @@ index 19b7c91a..64dcb9a6 100644
  # Example of overriding settings on a per-user basis
  #Match User anoncvs
  #	X11Forwarding no
-diff --git a/version.h b/version.h
-index 806ead9a..c5ff7c70 100644
 --- a/version.h
 +++ b/version.h
 @@ -3,4 +3,5 @@

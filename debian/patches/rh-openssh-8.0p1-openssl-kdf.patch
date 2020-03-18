@@ -1,0 +1,137 @@
+commit 2c3ef499bfffce3cfd315edeebf202850ba4e00a
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Tue Apr 16 15:35:18 2019 +0200
+
+    Use the new OpenSSL KDF
+
+diff --git a/configure.ac b/configure.ac
+index 2a455e4e..e01c3d43 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -2712,6 +2712,7 @@ if test "x$openssl" = "xyes" ; then
+ 		HMAC_CTX_init \
+ 		RSA_generate_key_ex \
+ 		RSA_get_default_method \
++		EVP_KDF_CTX_new_id \
+ 	])
+ 
+ 	# OpenSSL_add_all_algorithms may be a macro.
+diff --git a/kex.c b/kex.c
+index b6f041f4..1fbce2bb 100644
+--- a/kex.c
++++ b/kex.c
+@@ -38,6 +38,9 @@
+ #ifdef WITH_OPENSSL
+ #include <openssl/crypto.h>
+ #include <openssl/dh.h>
++# ifdef HAVE_EVP_KDF_CTX_NEW_ID
++# include <openssl/kdf.h>
++# endif
+ #endif
+ 
+ #include "ssh.h"
+@@ -942,6 +945,95 @@ kex_choose_conf(struct ssh *ssh)
+ 	return r;
+ }
+ 
++#ifdef HAVE_EVP_KDF_CTX_NEW_ID
++static const EVP_MD *
++digest_to_md(int digest_type)
++{
++	switch (digest_type) {
++	case SSH_DIGEST_SHA1:
++		return EVP_sha1();
++	case SSH_DIGEST_SHA256:
++		return EVP_sha256();
++	case SSH_DIGEST_SHA384:
++		return EVP_sha384();
++	case SSH_DIGEST_SHA512:
++		return EVP_sha512();
++	}
++	return NULL;
++}
++
++static int
++derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
++    const struct sshbuf *shared_secret, u_char **keyp)
++{
++	struct kex *kex = ssh->kex;
++	EVP_KDF_CTX *ctx = NULL;
++	u_char *key = NULL;
++	int r, key_len;
++
++	if ((key_len = ssh_digest_bytes(kex->hash_alg)) == 0)
++		return SSH_ERR_INVALID_ARGUMENT;
++	key_len = ROUNDUP(need, key_len);
++	if ((key = calloc(1, key_len)) == NULL) {
++		r = SSH_ERR_ALLOC_FAIL;
++		goto out;
++	}
++
++	ctx = EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
++	if (!ctx) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++
++	r = EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_MD, digest_to_md(kex->hash_alg));
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	r = EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KEY,
++	    sshbuf_ptr(shared_secret), sshbuf_len(shared_secret));
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	r = EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, hash, hashlen);
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	r = EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_TYPE, id);
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	r = EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID,
++	    kex->session_id, kex->session_id_len);
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	r = EVP_KDF_derive(ctx, key, key_len);
++	if (r != 1) {
++		r = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++#ifdef DEBUG_KEX
++	fprintf(stderr, "key '%c'== ", id);
++	dump_digest("key", key, key_len);
++#endif
++	*keyp = key;
++	key = NULL;
++	r = 0;
++
++out:
++	free (key);
++	EVP_KDF_CTX_free(ctx);
++	if (r < 0) {
++		return r;
++	}
++	return 0;
++}
++#else
+ static int
+ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
+     const struct sshbuf *shared_secret, u_char **keyp)
+@@ -1004,6 +1096,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
+ 	ssh_digest_free(hashctx);
+ 	return r;
+ }
++#endif /* HAVE_OPENSSL_EVP_KDF_CTX_NEW_ID */
+ 
+ #define NKEYS	6
+ int
+

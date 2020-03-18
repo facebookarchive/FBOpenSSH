@@ -1,0 +1,19 @@
+diff -up openssh-7.4p1/contrib/gnome-ssh-askpass2.c.grab-info openssh-7.4p1/contrib/gnome-ssh-askpass2.c
+--- openssh-7.4p1/contrib/gnome-ssh-askpass2.c.grab-info	2016-12-23 13:31:22.645213115 +0100
++++ openssh-7.4p1/contrib/gnome-ssh-askpass2.c	2016-12-23 13:31:40.997216691 +0100
+@@ -65,9 +65,12 @@ report_failed_grab (GtkWidget *parent_wi
+ 	err = gtk_message_dialog_new(GTK_WINDOW(parent_window), 0,
+ 				     GTK_MESSAGE_ERROR,
+ 				     GTK_BUTTONS_CLOSE,
+-				     "Could not grab %s. "
+-				     "A malicious client may be eavesdropping "
+-				     "on your session.", what);
++				     "SSH password dialog could not grab the %s input.\n"
++				     "This might be caused by application such as screensaver, "
++				     "however it could also mean that someone may be eavesdropping "
++				     "on your session.\n"
++				     "Either close the application which grabs the %s or "
++				     "log out and log in again to prevent this from happening.", what, what);
+ 	gtk_window_set_position(GTK_WINDOW(err), GTK_WIN_POS_CENTER);
+ 
+ 	gtk_dialog_run(GTK_DIALOG(err));

@@ -1,0 +1,324 @@
+From eb0d8e708a1f958aecd2d6e2ff2450af488d4c2a Mon Sep 17 00:00:00 2001
+From: "djm@openbsd.org" <djm@openbsd.org>
+Date: Mon, 15 Jul 2019 13:16:29 +0000
+Subject: [PATCH] upstream: support PKCS8 as an optional format for storage of
+
+private keys, enabled via "ssh-keygen -m PKCS8" on operations that save
+private keys to disk.
+
+The OpenSSH native key format remains the default, but PKCS8 is a
+superior format to PEM if interoperability with non-OpenSSH software
+is required, as it may use a less terrible KDF (IIRC PEM uses a single
+round of MD5 as a KDF).
+
+adapted from patch by Jakub Jelen via bz3013; ok markus
+
+OpenBSD-Commit-ID: 027824e3bc0b1c243dc5188504526d73a55accb1
+---
+ authfile.c   |  6 ++--
+ ssh-keygen.1 |  9 +++---
+ ssh-keygen.c | 25 +++++++++--------
+ sshkey.c     | 78 +++++++++++++++++++++++++++++++++++++---------------
+ sshkey.h     | 11 ++++++--
+ 5 files changed, 87 insertions(+), 42 deletions(-)
+
+diff --git a/authfile.c b/authfile.c
+index 2166c1689..851c1a8a1 100644
+--- a/authfile.c
++++ b/authfile.c
+@@ -74,7 +74,7 @@ sshkey_save_private_blob(struct sshbuf *keybuf, const char *filename)
+ int
+ sshkey_save_private(struct sshkey *key, const char *filename,
+     const char *passphrase, const char *comment,
+-    int force_new_format, const char *new_format_cipher, int new_format_rounds)
++    int format, const char *openssh_format_cipher, int openssh_format_rounds)
+ {
+ 	struct sshbuf *keyblob = NULL;
+ 	int r;
+@@ -82,7 +82,7 @@ sshkey_save_private(struct sshkey *key, const char *filename,
+ 	if ((keyblob = sshbuf_new()) == NULL)
+ 		return SSH_ERR_ALLOC_FAIL;
+ 	if ((r = sshkey_private_to_fileblob(key, keyblob, passphrase, comment,
+-	    force_new_format, new_format_cipher, new_format_rounds)) != 0)
++	    format, openssh_format_cipher, openssh_format_rounds)) != 0)
+ 		goto out;
+ 	if ((r = sshkey_save_private_blob(keyblob, filename)) != 0)
+ 		goto out;
+diff --git a/ssh-keygen.1 b/ssh-keygen.1
+index f42127c60..8184a1797 100644
+--- a/ssh-keygen.1
++++ b/ssh-keygen.1
+@@ -419,11 +419,12 @@ The supported key formats are:
+ .Dq RFC4716
+ (RFC 4716/SSH2 public or private key),
+ .Dq PKCS8
+-(PEM PKCS8 public key)
++(PKCS8 public or private key)
+ or
+ .Dq PEM
+ (PEM public key).
+-The default conversion format is
++By default OpenSSH will write newly-generated private keys in its own
++format, but when converting public keys for export the default format is
+ .Dq RFC4716 .
+ Setting a format of
+ .Dq PEM
+diff --git a/ssh-keygen.c b/ssh-keygen.c
+index b019a02ff..5dcad1f61 100644
+--- a/ssh-keygen.c
++++ b/ssh-keygen.c
+@@ -147,11 +147,11 @@ static char *key_type_name = NULL;
+ /* Load key from this PKCS#11 provider */
+ static char *pkcs11provider = NULL;
+ 
+-/* Use new OpenSSH private key format when writing SSH2 keys instead of PEM */
+-static int use_new_format = 1;
++/* Format for writing private keys */
++static int private_key_format = SSHKEY_PRIVATE_OPENSSH;
+ 
+ /* Cipher for new-format private keys */
+-static char *new_format_cipher = NULL;
++static char *openssh_format_cipher = NULL;
+ 
+ /*
+  * Number of KDF rounds to derive new format keys /
+@@ -1048,7 +1048,8 @@ do_gen_all_hostkeys(struct passwd *pw)
+ 		snprintf(comment, sizeof comment, "%s@%s", pw->pw_name,
+ 		    hostname);
+ 		if ((r = sshkey_save_private(private, prv_tmp, "",
+-		    comment, use_new_format, new_format_cipher, rounds)) != 0) {
++		    comment, private_key_format, openssh_format_cipher,
++		    rounds)) != 0) {
+ 			error("Saving key \"%s\" failed: %s",
+ 			    prv_tmp, ssh_err(r));
+ 			goto failnext;
+@@ -1391,7 +1392,7 @@ do_change_passphrase(struct passwd *pw)
+ 
+ 	/* Save the file using the new passphrase. */
+ 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
+-	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
++	    comment, private_key_format, openssh_format_cipher, rounds)) != 0) {
+ 		error("Saving key \"%s\" failed: %s.",
+ 		    identity_file, ssh_err(r));
+ 		explicit_bzero(passphrase1, strlen(passphrase1));
+@@ -1480,7 +1481,7 @@ do_change_comment(struct passwd *pw, const char *identity_comment)
+ 	}
+ 
+ 	if (private->type != KEY_ED25519 && private->type != KEY_XMSS &&
+-	    !use_new_format) {
++	    private_key_format != SSHKEY_PRIVATE_OPENSSH) {
+ 		error("Comments are only supported for keys stored in "
+ 		    "the new format (-o).");
+ 		explicit_bzero(passphrase, strlen(passphrase));
+@@ -1514,7 +1515,8 @@ do_change_comment(struct passwd *pw, const char *identity_comment)
+ 
+ 	/* Save the file using the new passphrase. */
+ 	if ((r = sshkey_save_private(private, identity_file, passphrase,
+-	    new_comment, use_new_format, new_format_cipher, rounds)) != 0) {
++	    new_comment, private_key_format, openssh_format_cipher,
++	    rounds)) != 0) {
+ 		error("Saving key \"%s\" failed: %s",
+ 		    identity_file, ssh_err(r));
+ 		explicit_bzero(passphrase, strlen(passphrase));
+@@ -2525,11 +2527,12 @@ main(int argc, char **argv)
+ 			}
+ 			if (strcasecmp(optarg, "PKCS8") == 0) {
+ 				convert_format = FMT_PKCS8;
++				private_key_format = SSHKEY_PRIVATE_PKCS8;
+ 				break;
+ 			}
+ 			if (strcasecmp(optarg, "PEM") == 0) {
+ 				convert_format = FMT_PEM;
+-				use_new_format = 0;
++				private_key_format = SSHKEY_PRIVATE_PEM;
+ 				break;
+ 			}
+ 			fatal("Unsupported conversion format \"%s\"", optarg);
+@@ -2567,7 +2570,7 @@ main(int argc, char **argv)
+ 			add_cert_option(optarg);
+ 			break;
+ 		case 'Z':
+-			new_format_cipher = optarg;
++			openssh_format_cipher = optarg;
+ 			break;
+ 		case 'C':
+ 			identity_comment = optarg;
+@@ -2912,7 +2915,7 @@ main(int argc, char **argv)
+ 
+ 	/* Save the key with the given passphrase and comment. */
+ 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
+-	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
++	    comment, private_key_format, openssh_format_cipher, rounds)) != 0) {
+ 		error("Saving key \"%s\" failed: %s",
+ 		    identity_file, ssh_err(r));
+ 		explicit_bzero(passphrase1, strlen(passphrase1));
+diff --git a/sshkey.c b/sshkey.c
+index 6b5ff0485..a0cea9257 100644
+--- a/sshkey.c
++++ b/sshkey.c
+@@ -3975,10 +3975,10 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
+ 
+ 
+ #ifdef WITH_OPENSSL
+-/* convert SSH v2 key in OpenSSL PEM format */
++/* convert SSH v2 key to PEM or PKCS#8 format */
+ static int
+-sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *blob,
+-    const char *_passphrase, const char *comment)
++sshkey_private_to_blob_pem_pkcs8(struct sshkey *key, struct sshbuf *blob,
++    int format, const char *_passphrase, const char *comment)
+ {
+ 	int success, r;
+ 	int blen, len = strlen(_passphrase);
+@@ -3988,26 +3988,46 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *buf,
+ 	const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
+ 	char *bptr;
+ 	BIO *bio = NULL;
++	EVP_PKEY *pkey = NULL;
+ 
+ 	if (len > 0 && len <= 4)
+ 		return SSH_ERR_PASSPHRASE_TOO_SHORT;
+-	if ((bio = BIO_new(BIO_s_mem())) == NULL)
+-		return SSH_ERR_ALLOC_FAIL;
++ 	if ((bio = BIO_new(BIO_s_mem())) == NULL) {
++		r = SSH_ERR_ALLOC_FAIL;
++		goto out;
++ 	}
++
++	if (format == SSHKEY_PRIVATE_PKCS8 && (pkey = EVP_PKEY_new()) == NULL) {
++		r = SSH_ERR_ALLOC_FAIL;
++		goto out;
++ 	}
+ 
+ 	switch (key->type) {
+ 	case KEY_DSA:
+-		success = PEM_write_bio_DSAPrivateKey(bio, key->dsa,
+-		    cipher, passphrase, len, NULL, NULL);
++		if (format == SSHKEY_PRIVATE_PEM) {
++			success = PEM_write_bio_DSAPrivateKey(bio, key->dsa,
++			    cipher, passphrase, len, NULL, NULL);
++		} else {
++			success = EVP_PKEY_set1_DSA(pkey, key->dsa);
++		}
+ 		break;
+ #ifdef OPENSSL_HAS_ECC
+ 	case KEY_ECDSA:
+-		success = PEM_write_bio_ECPrivateKey(bio, key->ecdsa,
+-		    cipher, passphrase, len, NULL, NULL);
++		if (format == SSHKEY_PRIVATE_PEM) {
++			success = PEM_write_bio_ECPrivateKey(bio, key->ecdsa,
++			    cipher, passphrase, len, NULL, NULL);
++		} else {
++			success = EVP_PKEY_set1_EC_KEY(pkey, key->ecdsa);
++		}
+ 		break;
+ #endif
+ 	case KEY_RSA:
+-		success = PEM_write_bio_RSAPrivateKey(bio, key->rsa,
+-		    cipher, passphrase, len, NULL, NULL);
++		if (format == SSHKEY_PRIVATE_PEM) {
++			success = PEM_write_bio_RSAPrivateKey(bio, key->rsa,
++			    cipher, passphrase, len, NULL, NULL);
++		} else {
++			success = EVP_PKEY_set1_RSA(pkey, key->rsa);
++		}
+ 		break;
+ 	default:
+ 		success = 0;
+@@ -4023,6 +4040,13 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *buf,
+ 		r = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
+ 	}
++	if (format == SSHKEY_PRIVATE_PKCS8) {
++		if ((success = PEM_write_bio_PrivateKey(bio, pkey, cipher,
++		    passphrase, len, NULL, NULL)) == 0) {
++			r = SSH_ERR_LIBCRYPTO_ERROR;
++			goto out;
++		}
++	}
+ 	if ((blen = BIO_get_mem_data(bio, &bptr)) <= 0) {
+ 		r = SSH_ERR_INTERNAL_ERROR;
+ 		goto out;
+@@ -4035,6 +4059,7 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *buf,
+ 		goto out;
+ 	r = 0;
+  out:
++	EVP_PKEY_free(pkey);
+ 	BIO_free(bio);
+ 	return r;
+ }
+@@ -4046,29 +4071,38 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *buf,
+ int
+ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
+     const char *passphrase, const char *comment,
+-    int force_new_format, const char *new_format_cipher, int new_format_rounds)
++    int format, const char *openssh_format_cipher, int openssh_format_rounds)
+ {
+ 	switch (key->type) {
+ #ifdef WITH_OPENSSL
+ 	case KEY_DSA:
+ 	case KEY_ECDSA:
+ 	case KEY_RSA:
+-		if (force_new_format) {
+-			return sshkey_private_to_blob2(key, blob, passphrase,
+-			    comment, new_format_cipher, new_format_rounds);
+-		}
+-		return sshkey_private_pem_to_blob(key, blob,
+-		    passphrase, comment);
++		break; /* see below */
+ #endif /* WITH_OPENSSL */
+ 	case KEY_ED25519:
+ #ifdef WITH_XMSS
+ 	case KEY_XMSS:
+ #endif /* WITH_XMSS */
+ 		return sshkey_private_to_blob2(key, blob, passphrase,
+-		    comment, new_format_cipher, new_format_rounds);
++		    comment, openssh_format_cipher, openssh_format_rounds);
+ 	default:
+ 		return SSH_ERR_KEY_TYPE_UNKNOWN;
+ 	}
++
++#ifdef WITH_OPENSSL
++	switch (format) {
++	case SSHKEY_PRIVATE_OPENSSH:
++		return sshkey_private_to_blob2(key, blob, passphrase,
++		    comment, openssh_format_cipher, openssh_format_rounds);
++	case SSHKEY_PRIVATE_PEM:
++	case SSHKEY_PRIVATE_PKCS8:
++		return sshkey_private_to_blob_pem_pkcs8(key, blob,
++		    format, passphrase, comment);
++	default:
++		return SSH_ERR_INVALID_ARGUMENT;
++	}
++#endif /* WITH_OPENSSL */
+ }
+ 
+ 
+diff --git a/sshkey.h b/sshkey.h
+index 41d159a1b..d30a69cc9 100644
+--- a/sshkey.h
++++ b/sshkey.h
+@@ -88,6 +88,13 @@ enum sshkey_serialize_rep {
+ 	SSHKEY_SERIALIZE_INFO = 254,
+ };
+ 
++/* Private key disk formats */
++enum sshkey_private_format {
++	SSHKEY_PRIVATE_OPENSSH = 0,
++	SSHKEY_PRIVATE_PEM = 1,
++	SSHKEY_PRIVATE_PKCS8 = 2,
++};
++
+ /* key is stored in external hardware */
+ #define SSHKEY_FLAG_EXT		0x0001
+ 
+@@ -221,7 +228,7 @@ int	sshkey_private_deserialize(struct sshbuf *buf,  struct sshkey **keyp);
+ /* private key file format parsing and serialisation */
+ int	sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
+     const char *passphrase, const char *comment,
+-    int force_new_format, const char *new_format_cipher, int new_format_rounds);
++    int format, const char *openssh_format_cipher, int openssh_format_rounds);
+ int	sshkey_parse_private_fileblob(struct sshbuf *buffer,
+     const char *passphrase, struct sshkey **keyp, char **commentp);
+ int	sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
+

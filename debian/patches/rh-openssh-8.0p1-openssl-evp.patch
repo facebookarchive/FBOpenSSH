@@ -1,0 +1,720 @@
+From ed7ec0cdf577ffbb0b15145340cf51596ca3eb89 Mon Sep 17 00:00:00 2001
+From: Jakub Jelen <jjelen@redhat.com>
+Date: Tue, 14 May 2019 10:45:45 +0200
+Subject: [PATCH] Use high-level OpenSSL API for signatures
+
+---
+ digest-openssl.c |  16 ++++
+ digest.h         |   6 ++
+ ssh-dss.c        |  65 ++++++++++------
+ ssh-ecdsa.c      |  69 ++++++++++-------
+ ssh-rsa.c        | 193 +++++++++--------------------------------------
+ sshkey.c         |  77 +++++++++++++++++++
+ sshkey.h         |   4 +
+ 7 files changed, 221 insertions(+), 209 deletions(-)
+
+diff --git a/digest-openssl.c b/digest-openssl.c
+index da7ed72bc..6a21d8adb 100644
+--- a/digest-openssl.c
++++ b/digest-openssl.c
+@@ -63,6 +63,22 @@ const struct ssh_digest digests[] = {
+ 	{ -1,			NULL,		0,	NULL },
+ };
+ 
++const EVP_MD *
++ssh_digest_to_md(int digest_type)
++{
++	switch (digest_type) {
++	case SSH_DIGEST_SHA1:
++		return EVP_sha1();
++	case SSH_DIGEST_SHA256:
++		return EVP_sha256();
++	case SSH_DIGEST_SHA384:
++		return EVP_sha384();
++	case SSH_DIGEST_SHA512:
++		return EVP_sha512();
++	}
++	return NULL;
++}
++
+ static const struct ssh_digest *
+ ssh_digest_by_alg(int alg)
+ {
+diff --git a/digest.h b/digest.h
+index 274574d0e..c7ceeb36f 100644
+--- a/digest.h
++++ b/digest.h
+@@ -32,6 +32,12 @@
+ struct sshbuf;
+ struct ssh_digest_ctx;
+ 
++#ifdef WITH_OPENSSL
++#include <openssl/evp.h>
++/* Converts internal digest representation to the OpenSSL one */
++const EVP_MD *ssh_digest_to_md(int digest_type);
++#endif
++
+ /* Looks up a digest algorithm by name */
+ int ssh_digest_alg_by_name(const char *name);
+ 
+diff --git a/ssh-dss.c b/ssh-dss.c
+index a23c383dc..ea45e7275 100644
+--- a/ssh-dss.c
++++ b/ssh-dss.c
+@@ -52,11 +52,15 @@ int
+ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+     const u_char *data, size_t datalen, u_int compat)
+ {
++	EVP_PKEY *pkey = NULL;
+ 	DSA_SIG *sig = NULL;
+ 	const BIGNUM *sig_r, *sig_s;
+-	u_char digest[SSH_DIGEST_MAX_LENGTH], sigblob[SIGBLOB_LEN];
+-	size_t rlen, slen, len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
++	u_char sigblob[SIGBLOB_LEN];
++	size_t rlen, slen;
++	int len;
+ 	struct sshbuf *b = NULL;
++	u_char *sigb = NULL;
++	const u_char *psig = NULL;
+ 	int ret = SSH_ERR_INVALID_ARGUMENT;
+ 
+ 	if (lenp != NULL)
+@@ -67,17 +71,24 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 	if (key == NULL || key->dsa == NULL ||
+ 	    sshkey_type_plain(key->type) != KEY_DSA)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+-	if (dlen == 0)
+-		return SSH_ERR_INTERNAL_ERROR;
+ 
+-	if ((ret = ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+-	    digest, sizeof(digest))) != 0)
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_DSA(pkey, key->dsa) != 1)
++		return SSH_ERR_ALLOC_FAIL;
++	ret = sshkey_calculate_signature(pkey, SSH_DIGEST_SHA1, &sigb, &len,
++	    data, datalen);
++	EVP_PKEY_free(pkey);
++	if (ret < 0) {
+ 		goto out;
++	}
+ 
+-	if ((sig = DSA_do_sign(digest, dlen, key->dsa)) == NULL) {
++	psig = sigb;
++	if ((sig = d2i_DSA_SIG(NULL, &psig, len)) == NULL) {
+ 		ret = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
+ 	}
++	free(sigb);
++	sigb = NULL;
+ 
+ 	DSA_SIG_get0(sig, &sig_r, &sig_s);
+ 	rlen = BN_num_bytes(sig_r);
+@@ -110,7 +121,7 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 		*lenp = len;
+ 	ret = 0;
+  out:
+-	explicit_bzero(digest, sizeof(digest));
++	free(sigb);
+ 	DSA_SIG_free(sig);
+ 	sshbuf_free(b);
+ 	return ret;
+@@ -121,20 +132,20 @@ ssh_dss_verify(const struct sshkey *key,
+     const u_char *signature, size_t signaturelen,
+     const u_char *data, size_t datalen, u_int compat)
+ {
++	EVP_PKEY *pkey = NULL;
+ 	DSA_SIG *sig = NULL;
+ 	BIGNUM *sig_r = NULL, *sig_s = NULL;
+-	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob = NULL;
+-	size_t len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
++	u_char *sigblob = NULL;
++	size_t len, slen;
+ 	int ret = SSH_ERR_INTERNAL_ERROR;
+ 	struct sshbuf *b = NULL;
+ 	char *ktype = NULL;
++	u_char *sigb = NULL, *psig = NULL;
+ 
+ 	if (key == NULL || key->dsa == NULL ||
+ 	    sshkey_type_plain(key->type) != KEY_DSA ||
+ 	    signature == NULL || signaturelen == 0)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+-	if (dlen == 0)
+-		return SSH_ERR_INTERNAL_ERROR;
+ 
+ 	/* fetch signature */
+ 	if ((b = sshbuf_from(signature, signaturelen)) == NULL)
+@@ -176,25 +187,31 @@ ssh_dss_verify(const struct sshkey *key,
+ 	}
+ 	sig_r = sig_s = NULL; /* transferred */
+ 
+-	/* sha1 the data */
+-	if ((ret = ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+-	    digest, sizeof(digest))) != 0)
++	if ((slen = i2d_DSA_SIG(sig, NULL)) == 0) {
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
+-
+-	switch (DSA_do_verify(digest, dlen, sig, key->dsa)) {
+-	case 1:
+-		ret = 0;
+-		break;
+-	case 0:
+-		ret = SSH_ERR_SIGNATURE_INVALID;
++	}
++	if ((sigb = malloc(slen)) == NULL) {
++		ret = SSH_ERR_ALLOC_FAIL;
+ 		goto out;
+-	default:
++	}
++	psig = sigb;
++	if ((slen = i2d_DSA_SIG(sig, &psig)) == 0) {
+ 		ret = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
+ 	}
+ 
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_DSA(pkey, key->dsa) != 1) {
++		ret = SSH_ERR_ALLOC_FAIL;
++		goto out;
++	}
++	ret = sshkey_verify_signature(pkey, SSH_DIGEST_SHA1, data, datalen,
++	    sigb, slen);
++	EVP_PKEY_free(pkey);
++
+  out:
+-	explicit_bzero(digest, sizeof(digest));
++	free(sigb);
+ 	DSA_SIG_free(sig);
+ 	BN_clear_free(sig_r);
+ 	BN_clear_free(sig_s);
+diff --git a/ssh-ecdsa.c b/ssh-ecdsa.c
+index 599c7199d..b036796e8 100644
+--- a/ssh-ecdsa.c
++++ b/ssh-ecdsa.c
+@@ -50,11 +50,13 @@ int
+ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+     const u_char *data, size_t datalen, u_int compat)
+ {
++	EVP_PKEY *pkey = NULL;
+ 	ECDSA_SIG *sig = NULL;
++	unsigned char *sigb = NULL;
++	const unsigned char *psig;
+ 	const BIGNUM *sig_r, *sig_s;
+ 	int hash_alg;
+-	u_char digest[SSH_DIGEST_MAX_LENGTH];
+-	size_t len, dlen;
++	int len;
+ 	struct sshbuf *b = NULL, *bb = NULL;
+ 	int ret = SSH_ERR_INTERNAL_ERROR;
+ 
+@@ -67,18 +69,24 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 	    sshkey_type_plain(key->type) != KEY_ECDSA)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+ 
+-	if ((hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid)) == -1 ||
+-	    (dlen = ssh_digest_bytes(hash_alg)) == 0)
++	if ((hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid)) == -1)
+ 		return SSH_ERR_INTERNAL_ERROR;
+-	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+-	    digest, sizeof(digest))) != 0)
++
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_EC_KEY(pkey, key->ecdsa) != 1)
++		return SSH_ERR_ALLOC_FAIL;
++	ret = sshkey_calculate_signature(pkey, hash_alg, &sigb, &len, data,
++	    datalen);
++	EVP_PKEY_free(pkey);
++	if (ret < 0) {
+ 		goto out;
++	}
+ 
+-	if ((sig = ECDSA_do_sign(digest, dlen, key->ecdsa)) == NULL) {
++	psig = sigb;
++	if ((sig = d2i_ECDSA_SIG(NULL, &psig, len)) == NULL) {
+ 		ret = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
+ 	}
+-
+ 	if ((bb = sshbuf_new()) == NULL || (b = sshbuf_new()) == NULL) {
+ 		ret = SSH_ERR_ALLOC_FAIL;
+ 		goto out;
+@@ -102,7 +110,7 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 		*lenp = len;
+ 	ret = 0;
+  out:
+-	explicit_bzero(digest, sizeof(digest));
++	free(sigb);
+ 	sshbuf_free(b);
+ 	sshbuf_free(bb);
+ 	ECDSA_SIG_free(sig);
+@@ -115,22 +123,21 @@ ssh_ecdsa_verify(const struct sshkey *key,
+     const u_char *signature, size_t signaturelen,
+     const u_char *data, size_t datalen, u_int compat)
+ {
++	EVP_PKEY *pkey = NULL;
+ 	ECDSA_SIG *sig = NULL;
+ 	BIGNUM *sig_r = NULL, *sig_s = NULL;
+-	int hash_alg;
+-	u_char digest[SSH_DIGEST_MAX_LENGTH];
+-	size_t dlen;
++	int hash_alg, len;
+ 	int ret = SSH_ERR_INTERNAL_ERROR;
+ 	struct sshbuf *b = NULL, *sigbuf = NULL;
+ 	char *ktype = NULL;
++	unsigned char *sigb = NULL, *psig = NULL;
+ 
+ 	if (key == NULL || key->ecdsa == NULL ||
+ 	    sshkey_type_plain(key->type) != KEY_ECDSA ||
+ 	    signature == NULL || signaturelen == 0)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+ 
+-	if ((hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid)) == -1 ||
+-	    (dlen = ssh_digest_bytes(hash_alg)) == 0)
++	if ((hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid)) == -1)
+ 		return SSH_ERR_INTERNAL_ERROR;
+ 
+ 	/* fetch signature */
+@@ -166,28 +173,36 @@ ssh_ecdsa_verify(const struct sshkey *key,
+ 	}
+ 	sig_r = sig_s = NULL; /* transferred */
+ 
+-	if (sshbuf_len(sigbuf) != 0) {
+-		ret = SSH_ERR_UNEXPECTED_TRAILING_DATA;
++	/* Figure out the length */
++	if ((len = i2d_ECDSA_SIG(sig, NULL)) == 0) {
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
++		goto out;
++	}
++	if ((sigb = malloc(len)) == NULL) {
++		ret = SSH_ERR_ALLOC_FAIL;
+ 		goto out;
+ 	}
+-	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+-	    digest, sizeof(digest))) != 0)
++	psig = sigb;
++	if ((len = i2d_ECDSA_SIG(sig, &psig)) == 0) {
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
+ 		goto out;
++	}
+ 
+-	switch (ECDSA_do_verify(digest, dlen, sig, key->ecdsa)) {
+-	case 1:
+-		ret = 0;
+-		break;
+-	case 0:
+-		ret = SSH_ERR_SIGNATURE_INVALID;
++	if (sshbuf_len(sigbuf) != 0) {
++		ret = SSH_ERR_UNEXPECTED_TRAILING_DATA;
+ 		goto out;
+-	default:
+-		ret = SSH_ERR_LIBCRYPTO_ERROR;
++	}
++
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_EC_KEY(pkey, key->ecdsa) != 1) {
++		ret =  SSH_ERR_ALLOC_FAIL;
+ 		goto out;
+ 	}
++	ret = sshkey_verify_signature(pkey, hash_alg, data, datalen, sigb, len);
++	EVP_PKEY_free(pkey);
+ 
+  out:
+-	explicit_bzero(digest, sizeof(digest));
++	free(sigb);
+ 	sshbuf_free(sigbuf);
+ 	sshbuf_free(b);
+ 	ECDSA_SIG_free(sig);
+diff --git a/ssh-rsa.c b/ssh-rsa.c
+index 9b14f9a9a..8ef3a6aca 100644
+--- a/ssh-rsa.c
++++ b/ssh-rsa.c
+@@ -37,7 +37,7 @@
+ 
+ #include "openbsd-compat/openssl-compat.h"
+ 
+-static int openssh_RSA_verify(int, u_char *, size_t, u_char *, size_t, RSA *);
++static int openssh_RSA_verify(int, const u_char *, size_t, u_char *, size_t, EVP_PKEY *);
+ 
+ static const char *
+ rsa_hash_alg_ident(int hash_alg)
+@@ -90,21 +90,6 @@ rsa_hash_id_from_keyname(const char *alg)
+ 	return -1;
+ }
+ 
+-static int
+-rsa_hash_alg_nid(int type)
+-{
+-	switch (type) {
+-	case SSH_DIGEST_SHA1:
+-		return NID_sha1;
+-	case SSH_DIGEST_SHA256:
+-		return NID_sha256;
+-	case SSH_DIGEST_SHA512:
+-		return NID_sha512;
+-	default:
+-		return -1;
+-	}
+-}
+-
+ int
+ ssh_rsa_complete_crt_parameters(struct sshkey *key, const BIGNUM *iqmp)
+ {
+@@ -164,11 +149,10 @@ int
+ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+     const u_char *data, size_t datalen, const char *alg_ident)
+ {
+-	const BIGNUM *rsa_n;
+-	u_char digest[SSH_DIGEST_MAX_LENGTH], *sig = NULL;
+-	size_t slen = 0;
+-	u_int dlen, len;
+-	int nid, hash_alg, ret = SSH_ERR_INTERNAL_ERROR;
++	EVP_PKEY *pkey = NULL;
++	u_char *sig = NULL;
++	int len, slen = 0;
++	int hash_alg, ret = SSH_ERR_INTERNAL_ERROR;
+ 	struct sshbuf *b = NULL;
+ 
+ 	if (lenp != NULL)
+@@ -180,33 +164,24 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 		hash_alg = SSH_DIGEST_SHA1;
+ 	else
+ 		hash_alg = rsa_hash_id_from_keyname(alg_ident);
++
+ 	if (key == NULL || key->rsa == NULL || hash_alg == -1 ||
+ 	    sshkey_type_plain(key->type) != KEY_RSA)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+-	RSA_get0_key(key->rsa, &rsa_n, NULL, NULL);
+-	if (BN_num_bits(rsa_n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
+-		return SSH_ERR_KEY_LENGTH;
+ 	slen = RSA_size(key->rsa);
+-	if (slen <= 0 || slen > SSHBUF_MAX_BIGNUM)
+-		return SSH_ERR_INVALID_ARGUMENT;
+-
+-	/* hash the data */
+-	nid = rsa_hash_alg_nid(hash_alg);
+-	if ((dlen = ssh_digest_bytes(hash_alg)) == 0)
+-		return SSH_ERR_INTERNAL_ERROR;
+-	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+-	    digest, sizeof(digest))) != 0)
+-		goto out;
++	if (RSA_bits(key->rsa) < SSH_RSA_MINIMUM_MODULUS_SIZE)
++		return SSH_ERR_KEY_LENGTH;
+ 
+-	if ((sig = malloc(slen)) == NULL) {
+-		ret = SSH_ERR_ALLOC_FAIL;
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_RSA(pkey, key->rsa) != 1)
++		return SSH_ERR_ALLOC_FAIL;
++	ret = sshkey_calculate_signature(pkey, hash_alg, &sig, &len, data,
++	    datalen);
++	EVP_PKEY_free(pkey);
++	if (ret < 0) {
+ 		goto out;
+ 	}
+ 
+-	if (RSA_sign(nid, digest, dlen, sig, &len, key->rsa) != 1) {
+-		ret = SSH_ERR_LIBCRYPTO_ERROR;
+-		goto out;
+-	}
+ 	if (len < slen) {
+ 		size_t diff = slen - len;
+ 		memmove(sig + diff, sig, len);
+@@ -215,6 +190,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 		ret = SSH_ERR_INTERNAL_ERROR;
+ 		goto out;
+ 	}
++
+ 	/* encode signature */
+ 	if ((b = sshbuf_new()) == NULL) {
+ 		ret = SSH_ERR_ALLOC_FAIL;
+@@ -235,7 +211,6 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+ 		*lenp = len;
+ 	ret = 0;
+  out:
+-	explicit_bzero(digest, sizeof(digest));
+ 	freezero(sig, slen);
+ 	sshbuf_free(b);
+ 	return ret;
+@@ -246,10 +221,10 @@ ssh_rsa_verify(const struct sshkey *key,
+     const u_char *sig, size_t siglen, const u_char *data, size_t datalen,
+     const char *alg)
+ {
+-	const BIGNUM *rsa_n;
++	EVP_PKEY *pkey = NULL;
+ 	char *sigtype = NULL;
+ 	int hash_alg, want_alg, ret = SSH_ERR_INTERNAL_ERROR;
+-	size_t len = 0, diff, modlen, dlen;
++	size_t len = 0, diff, modlen;
+ 	struct sshbuf *b = NULL;
+ 	u_char digest[SSH_DIGEST_MAX_LENGTH], *osigblob, *sigblob = NULL;
+ 
+@@ -257,8 +232,7 @@ ssh_rsa_verify(const struct sshkey *key,
+ 	    sshkey_type_plain(key->type) != KEY_RSA ||
+ 	    sig == NULL || siglen == 0)
+ 		return SSH_ERR_INVALID_ARGUMENT;
+-	RSA_get0_key(key->rsa, &rsa_n, NULL, NULL);
+-	if (BN_num_bits(rsa_n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
++	if (RSA_bits(key->rsa) < SSH_RSA_MINIMUM_MODULUS_SIZE)
+ 		return SSH_ERR_KEY_LENGTH;
+ 
+ 	if ((b = sshbuf_from(sig, siglen)) == NULL)
+@@ -310,16 +284,15 @@ ssh_rsa_verify(const struct sshkey *key,
+ 		explicit_bzero(sigblob, diff);
+ 		len = modlen;
+ 	}
+-	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
+-		ret = SSH_ERR_INTERNAL_ERROR;
++
++	if ((pkey = EVP_PKEY_new()) == NULL ||
++	    EVP_PKEY_set1_RSA(pkey, key->rsa) != 1) {
++		ret = SSH_ERR_ALLOC_FAIL;
+ 		goto out;
+ 	}
+-	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+-	    digest, sizeof(digest))) != 0)
+-		goto out;
++	ret = openssh_RSA_verify(hash_alg, data, datalen, sigblob, len, pkey);
++	EVP_PKEY_free(pkey);
+ 
+-	ret = openssh_RSA_verify(hash_alg, digest, dlen, sigblob, len,
+-	    key->rsa);
+  out:
+ 	freezero(sigblob, len);
+ 	free(sigtype);
+@@ -328,122 +301,26 @@ ssh_rsa_verify(const struct sshkey *key,
+ 	return ret;
+ }
+ 
+-/*
+- * See:
+- * http://www.rsasecurity.com/rsalabs/pkcs/pkcs-1/
+- * ftp://ftp.rsasecurity.com/pub/pkcs/pkcs-1/pkcs-1v2-1.asn
+- */
+-
+-/*
+- * id-sha1 OBJECT IDENTIFIER ::= { iso(1) identified-organization(3)
+- *	oiw(14) secsig(3) algorithms(2) 26 }
+- */
+-static const u_char id_sha1[] = {
+-	0x30, 0x21, /* type Sequence, length 0x21 (33) */
+-	0x30, 0x09, /* type Sequence, length 0x09 */
+-	0x06, 0x05, /* type OID, length 0x05 */
+-	0x2b, 0x0e, 0x03, 0x02, 0x1a, /* id-sha1 OID */
+-	0x05, 0x00, /* NULL */
+-	0x04, 0x14  /* Octet string, length 0x14 (20), followed by sha1 hash */
+-};
+-
+-/*
+- * See http://csrc.nist.gov/groups/ST/crypto_apps_infra/csor/algorithms.html
+- * id-sha256 OBJECT IDENTIFIER ::= { joint-iso-itu-t(2) country(16) us(840)
+- *      organization(1) gov(101) csor(3) nistAlgorithm(4) hashAlgs(2)
+- *      id-sha256(1) }
+- */
+-static const u_char id_sha256[] = {
+-	0x30, 0x31, /* type Sequence, length 0x31 (49) */
+-	0x30, 0x0d, /* type Sequence, length 0x0d (13) */
+-	0x06, 0x09, /* type OID, length 0x09 */
+-	0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, /* id-sha256 */
+-	0x05, 0x00, /* NULL */
+-	0x04, 0x20  /* Octet string, length 0x20 (32), followed by sha256 hash */
+-};
+-
+-/*
+- * See http://csrc.nist.gov/groups/ST/crypto_apps_infra/csor/algorithms.html
+- * id-sha512 OBJECT IDENTIFIER ::= { joint-iso-itu-t(2) country(16) us(840)
+- *      organization(1) gov(101) csor(3) nistAlgorithm(4) hashAlgs(2)
+- *      id-sha256(3) }
+- */
+-static const u_char id_sha512[] = {
+-	0x30, 0x51, /* type Sequence, length 0x51 (81) */
+-	0x30, 0x0d, /* type Sequence, length 0x0d (13) */
+-	0x06, 0x09, /* type OID, length 0x09 */
+-	0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, /* id-sha512 */
+-	0x05, 0x00, /* NULL */
+-	0x04, 0x40  /* Octet string, length 0x40 (64), followed by sha512 hash */
+-};
+-
+ static int
+-rsa_hash_alg_oid(int hash_alg, const u_char **oidp, size_t *oidlenp)
++openssh_RSA_verify(int hash_alg, const u_char *data, size_t datalen,
++    u_char *sigbuf, size_t siglen, EVP_PKEY *pkey)
+ {
+-	switch (hash_alg) {
+-	case SSH_DIGEST_SHA1:
+-		*oidp = id_sha1;
+-		*oidlenp = sizeof(id_sha1);
+-		break;
+-	case SSH_DIGEST_SHA256:
+-		*oidp = id_sha256;
+-		*oidlenp = sizeof(id_sha256);
+-		break;
+-	case SSH_DIGEST_SHA512:
+-		*oidp = id_sha512;
+-		*oidlenp = sizeof(id_sha512);
+-		break;
+-	default:
+-		return SSH_ERR_INVALID_ARGUMENT;
+-	}
+-	return 0;
+-}
++	size_t rsasize = 0;
++	const RSA *rsa;
++	int ret;
+ 
+-static int
+-openssh_RSA_verify(int hash_alg, u_char *hash, size_t hashlen,
+-    u_char *sigbuf, size_t siglen, RSA *rsa)
+-{
+-	size_t rsasize = 0, oidlen = 0, hlen = 0;
+-	int ret, len, oidmatch, hashmatch;
+-	const u_char *oid = NULL;
+-	u_char *decrypted = NULL;
+-
+-	if ((ret = rsa_hash_alg_oid(hash_alg, &oid, &oidlen)) != 0)
+-		return ret;
+-	ret = SSH_ERR_INTERNAL_ERROR;
+-	hlen = ssh_digest_bytes(hash_alg);
+-	if (hashlen != hlen) {
+-		ret = SSH_ERR_INVALID_ARGUMENT;
+-		goto done;
+-	}
++	rsa = EVP_PKEY_get0_RSA(pkey);
+ 	rsasize = RSA_size(rsa);
+ 	if (rsasize <= 0 || rsasize > SSHBUF_MAX_BIGNUM ||
+ 	    siglen == 0 || siglen > rsasize) {
+ 		ret = SSH_ERR_INVALID_ARGUMENT;
+ 		goto done;
+ 	}
+-	if ((decrypted = malloc(rsasize)) == NULL) {
+-		ret = SSH_ERR_ALLOC_FAIL;
+-		goto done;
+-	}
+-	if ((len = RSA_public_decrypt(siglen, sigbuf, decrypted, rsa,
+-	    RSA_PKCS1_PADDING)) < 0) {
+-		ret = SSH_ERR_LIBCRYPTO_ERROR;
+-		goto done;
+-	}
+-	if (len < 0 || (size_t)len != hlen + oidlen) {
+-		ret = SSH_ERR_INVALID_FORMAT;
+-		goto done;
+-	}
+-	oidmatch = timingsafe_bcmp(decrypted, oid, oidlen) == 0;
+-	hashmatch = timingsafe_bcmp(decrypted + oidlen, hash, hlen) == 0;
+-	if (!oidmatch || !hashmatch) {
+-		ret = SSH_ERR_SIGNATURE_INVALID;
+-		goto done;
+-	}
+-	ret = 0;
++
++	ret = sshkey_verify_signature(pkey, hash_alg, data, datalen,
++	    sigbuf, siglen);
++
+ done:
+-	freezero(decrypted, rsasize);
+ 	return ret;
+ }
+ #endif /* WITH_OPENSSL */
+diff --git a/sshkey.c b/sshkey.c
+index ad1957762..b95ed0b10 100644
+--- a/sshkey.c
++++ b/sshkey.c
+@@ -358,6 +358,83 @@ sshkey_type_plain(int type)
+ }
+ 
+ #ifdef WITH_OPENSSL
++int
++sshkey_calculate_signature(EVP_PKEY *pkey, int hash_alg, u_char **sigp,
++    int *lenp, const u_char *data, size_t datalen)
++{
++	EVP_MD_CTX *ctx = NULL;
++	u_char *sig = NULL;
++	int ret, slen, len;
++
++	if (sigp == NULL || lenp == NULL) {
++		return SSH_ERR_INVALID_ARGUMENT;
++	}
++
++	slen = EVP_PKEY_size(pkey);
++	if (slen <= 0 || slen > SSHBUF_MAX_BIGNUM)
++		return SSH_ERR_INVALID_ARGUMENT;
++
++	len = slen;
++	if ((sig = malloc(slen)) == NULL) {
++		return SSH_ERR_ALLOC_FAIL;
++	}
++
++	if ((ctx = EVP_MD_CTX_new()) == NULL) {
++		ret = SSH_ERR_ALLOC_FAIL;
++		goto error;
++	}
++	if (EVP_SignInit_ex(ctx, ssh_digest_to_md(hash_alg), NULL) <= 0 ||
++	    EVP_SignUpdate(ctx, data, datalen) <= 0 ||
++	    EVP_SignFinal(ctx, sig, &len, pkey) <= 0) {
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
++		goto error;
++	}
++
++	*sigp = sig;
++	*lenp = len;
++	/* Now owned by the caller */
++	sig = NULL;
++	ret = 0;
++
++error:
++	EVP_MD_CTX_free(ctx);
++	free(sig);
++	return ret;
++}
++
++int
++sshkey_verify_signature(EVP_PKEY *pkey, int hash_alg, const u_char *data,
++    size_t datalen, u_char *sigbuf, int siglen)
++{
++	EVP_MD_CTX *ctx = NULL;
++	int ret;
++
++	if ((ctx = EVP_MD_CTX_new()) == NULL) {
++		return SSH_ERR_ALLOC_FAIL;
++	}
++	if (EVP_VerifyInit_ex(ctx, ssh_digest_to_md(hash_alg), NULL) <= 0 ||
++	    EVP_VerifyUpdate(ctx, data, datalen) <= 0) {
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
++		goto done;
++	}
++	ret = EVP_VerifyFinal(ctx, sigbuf, siglen, pkey);
++	switch (ret) {
++	case 1:
++		ret = 0;
++		break;
++	case 0:
++		ret = SSH_ERR_SIGNATURE_INVALID;
++		break;
++	default:
++		ret = SSH_ERR_LIBCRYPTO_ERROR;
++		break;
++	}
++
++done:
++	EVP_MD_CTX_free(ctx);
++	return ret;
++}
++
+ /* XXX: these are really begging for a table-driven approach */
+ int
+ sshkey_curve_name_to_nid(const char *name)
+diff --git a/sshkey.h b/sshkey.h
+index a91e60436..270901a87 100644
+--- a/sshkey.h
++++ b/sshkey.h
+@@ -179,6 +179,10 @@ const char	*sshkey_ssh_name(const struct sshkey *);
+ const char	*sshkey_ssh_name_plain(const struct sshkey *);
+ int		 sshkey_names_valid2(const char *, int);
+ char		*sshkey_alg_list(int, int, int, char);
++int		 sshkey_calculate_signature(EVP_PKEY*, int, u_char **,
++    int *, const u_char *, size_t);
++int		 sshkey_verify_signature(EVP_PKEY *, int, const u_char *,
++    size_t, u_char *, int);
+ 
+ int	 sshkey_from_blob(const u_char *, size_t, struct sshkey **);
+ int	 sshkey_fromb(struct sshbuf *, struct sshkey **);
+

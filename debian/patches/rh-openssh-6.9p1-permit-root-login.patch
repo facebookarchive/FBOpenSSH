@@ -1,0 +1,12 @@
+diff -up openssh-7.0p1/sshd_config.root-login openssh-7.0p1/sshd_config
+--- openssh-7.0p1/sshd_config.root-login	2015-08-12 11:29:12.919269245 +0200
++++ openssh-7.0p1/sshd_config	2015-08-12 11:31:03.653096466 +0200
+@@ -46,7 +46,7 @@ SyslogFacility AUTHPRIV
+ # Authentication:
+ 
+ #LoginGraceTime 2m
+-#PermitRootLogin prohibit-password
++PermitRootLogin yes
+ #StrictModes yes
+ #MaxAuthTries 6
+ #MaxSessions 10

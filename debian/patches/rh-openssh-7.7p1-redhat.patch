@@ -1,0 +1,166 @@
+diff -up openssh-7.7p1/ssh_config.redhat openssh-7.7p1/ssh_config
+--- openssh-7.7p1/ssh_config.redhat	2018-04-02 07:38:28.000000000 +0200
++++ openssh-7.7p1/ssh_config	2018-07-03 10:44:06.522245125 +0200
+@@ -44,3 +44,7 @@
+ #   VisualHostKey no
+ #   ProxyCommand ssh -q -W %h:%p gateway.example.com
+ #   RekeyLimit 1G 1h
++#
++# To modify the system-wide ssh configuration, create a  *.conf  file under
++#  /etc/ssh/ssh_config.d/  which will be automatically included below
++Include /etc/ssh/ssh_config.d/*.conf
+diff -up openssh-7.7p1/ssh_config_redhat.redhat openssh-7.7p1/ssh_config_redhat
+--- openssh-7.7p1/ssh_config_redhat.redhat	2018-07-03 10:44:06.522245125 +0200
++++ openssh-7.7p1/ssh_config_redhat	2018-07-03 10:44:06.522245125 +0200
+@@ -0,0 +1,21 @@
++# The options here are in the "Match final block" to be applied as the last
++# options and could be potentially overwritten by the user configuration
++Match final all
++	# Follow system-wide Crypto Policy, if defined:
++	Include /etc/crypto-policies/back-ends/openssh.config
++
++	GSSAPIAuthentication yes
++
++# If this option is set to yes then remote X11 clients will have full access
++# to the original X11 display. As virtually no X11 client supports the untrusted
++# mode correctly we set this to yes.
++	ForwardX11Trusted yes
++
++# Send locale-related environment variables
++	SendEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
++	SendEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
++	SendEnv LC_IDENTIFICATION LC_ALL LANGUAGE
++	SendEnv XMODIFIERS
++
++# Uncomment this if you want to use .local domain
++# Host *.local
++#   CheckHostIP no
+diff -up openssh-7.7p1/sshd_config.0.redhat openssh-7.7p1/sshd_config.0
+--- openssh-7.7p1/sshd_config.0.redhat	2018-04-02 07:39:27.000000000 +0200
++++ openssh-7.7p1/sshd_config.0	2018-07-03 10:44:06.523245133 +0200
+@@ -872,9 +872,9 @@ DESCRIPTION
+ 
+      SyslogFacility
+              Gives the facility code that is used when logging messages from
+-             sshd(8).  The possible values are: DAEMON, USER, AUTH, LOCAL0,
+-             LOCAL1, LOCAL2, LOCAL3, LOCAL4, LOCAL5, LOCAL6, LOCAL7.  The
+-             default is AUTH.
++             sshd(8).  The possible values are: DAEMON, USER, AUTH, AUTHPRIV,
++             LOCAL0, LOCAL1, LOCAL2, LOCAL3, LOCAL4, LOCAL5, LOCAL6, LOCAL7.
++             The default is AUTH.
+ 
+      TCPKeepAlive
+              Specifies whether the system should send TCP keepalive messages
+diff -up openssh-7.7p1/sshd_config.5.redhat openssh-7.7p1/sshd_config.5
+--- openssh-7.7p1/sshd_config.5.redhat	2018-04-02 07:38:28.000000000 +0200
++++ openssh-7.7p1/sshd_config.5	2018-07-03 10:44:06.523245133 +0200
+@@ -1461,7 +1461,7 @@ By default no subsystems are defined.
+ .It Cm SyslogFacility
+ Gives the facility code that is used when logging messages from
+ .Xr sshd 8 .
+-The possible values are: DAEMON, USER, AUTH, LOCAL0, LOCAL1, LOCAL2,
++The possible values are: DAEMON, USER, AUTH, AUTHPRIV, LOCAL0, LOCAL1, LOCAL2,
+ LOCAL3, LOCAL4, LOCAL5, LOCAL6, LOCAL7.
+ The default is AUTH.
+ .It Cm TCPKeepAlive
+diff -up openssh-7.7p1/sshd_config.redhat openssh-7.7p1/sshd_config
+--- openssh-7.7p1/sshd_config.redhat	2018-04-02 07:38:28.000000000 +0200
++++ openssh-7.7p1/sshd_config	2018-07-03 10:45:16.950782466 +0200
+@@ -10,20 +10,34 @@
+ # possible, but leave them commented.  Uncommented options override the
+ # default value.
+ 
++# If you want to change the port on a SELinux system, you have to tell
++# SELinux about this change.
++# semanage port -a -t ssh_port_t -p tcp #PORTNUMBER
++#
+ #Port 22
+ #AddressFamily any
+ #ListenAddress 0.0.0.0
+ #ListenAddress ::
+ 
+-#HostKey /etc/ssh/ssh_host_rsa_key
+-#HostKey /etc/ssh/ssh_host_ecdsa_key
+-#HostKey /etc/ssh/ssh_host_ed25519_key
++HostKey /etc/ssh/ssh_host_rsa_key
++HostKey /etc/ssh/ssh_host_ecdsa_key
++HostKey /etc/ssh/ssh_host_ed25519_key
+ 
+ # Ciphers and keying
+ #RekeyLimit default none
+ 
++# System-wide Crypto policy:
++# This system is following system-wide crypto policy. The changes to
++# Ciphers, MACs, KexAlgoritms and GSSAPIKexAlgorithsm will not have any
++# effect here. They will be overridden by command-line options passed on
++# the server start up.
++# To opt out, uncomment a line with redefinition of  CRYPTO_POLICY=
++# variable in  /etc/sysconfig/sshd  to overwrite the policy.
++# For more information, see manual page for update-crypto-policies(8).
++
+ # Logging
+ #SyslogFacility AUTH
++SyslogFacility AUTHPRIV
+ #LogLevel INFO
+ 
+ # Authentication:
+@@ -56,9 +70,11 @@ AuthorizedKeysFile	.ssh/authorized_keys
+ # To disable tunneled clear text passwords, change to no here!
+ #PasswordAuthentication yes
+ #PermitEmptyPasswords no
++PasswordAuthentication yes
+ 
+ # Change to no to disable s/key passwords
+ #ChallengeResponseAuthentication yes
++ChallengeResponseAuthentication no
+ 
+ # Kerberos options
+ #KerberosAuthentication no
+@@ -67,8 +83,8 @@ AuthorizedKeysFile	.ssh/authorized_keys
+ #KerberosGetAFSToken no
+ 
+ # GSSAPI options
+-#GSSAPIAuthentication no
+-#GSSAPICleanupCredentials yes
++GSSAPIAuthentication yes
++GSSAPICleanupCredentials no
+ 
+ # Set this to 'yes' to enable PAM authentication, account processing,
+ # and session processing. If this is enabled, PAM authentication will
+@@ -79,16 +95,20 @@ AuthorizedKeysFile	.ssh/authorized_keys
+ # If you just want the PAM account and session checks to run without
+ # PAM authentication, then enable this but set PasswordAuthentication
+ # and ChallengeResponseAuthentication to 'no'.
+-#UsePAM no
++UsePAM yes
+ 
+ #AllowAgentForwarding yes
+ #AllowTcpForwarding yes
+ #GatewayPorts no
+-#X11Forwarding no
++X11Forwarding yes
+ #X11DisplayOffset 10
+ #X11UseLocalhost yes
+ #PermitTTY yes
+-#PrintMotd yes
++
++# It is recommended to use pam_motd in /etc/pam.d/sshd instead of PrintMotd,
++# as it is more configurable and versatile than the built-in version.
++PrintMotd no
++
+ #PrintLastLog yes
+ #TCPKeepAlive yes
+ #PermitUserEnvironment no
+@@ -106,6 +126,12 @@ AuthorizedKeysFile	.ssh/authorized_keys
+ # no default banner path
+ #Banner none
+ 
++# Accept locale-related environment variables
++AcceptEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
++AcceptEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
++AcceptEnv LC_IDENTIFICATION LC_ALL LANGUAGE
++AcceptEnv XMODIFIERS
++
+ # override default of no subsystems
+ Subsystem	sftp	/usr/libexec/sftp-server
+ 
