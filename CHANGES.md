@@ -26,3 +26,5 @@ and the user is authenticated by the certificate.
 config file.
 
 - Fix a bug where some options in `Match` clauses are not correctly `none`able.
+
+- Prevent password authentication with PAM if Kerberos authentication is used.
