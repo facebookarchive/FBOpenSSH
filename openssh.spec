@@ -1,9 +1,9 @@
 %define ver 8.0p1
 # We have this weird numbering scheme because if 2 packages have the same version
-# then yum starts to compare the release value and it seems that numbers are 
+# then yum starts to compare the release value and it seems that numbers are
 # bigger (bigger for yum means newer package) than letters so for example
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
-# So in order to cope with future updates we make some room, 30 should leave 
+# So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
 %define rel 31.fb1
 
@@ -78,14 +78,14 @@ Group: Applications/Internet
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{rel}.el%{rhel}.buildroot
 Obsoletes: ssh
 BuildRequires: redhat-rpm-config, autoconf, automake
-BuildRequires: perl, openssl-devel >= 1.1.1c, quilt, fipscheck-devel
+BuildRequires: perl, openssl-devel >= 1.1.1c, quilt, fipscheck-devel, systemd-devel
 %if %{asan}
 BuildRequires: libasan
 %endif
 BuildRequires: /usr/bin/login
 Requires: initscripts >= 5.20
 BuildRequires: perl, openssl-devel >= 1.1.1c, quilt,
-BuildRequires: systemd
+BuildRequires: systemd systemd-devel
 BuildRequires: glibc-devel, pam-devel
 %if ! %{no_gnome_askpass}
 BuildRequires: pkgconfig
@@ -190,6 +190,7 @@ echo K5DIR=$K5DIR
 	--with-superuser-path=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin \
 	--with-privsep-path=%{_var}/empty/sshd \
 	--disable-strip \
+        --with-systemd \
 %if %{scard}
 	--with-smartcard \
 %endif
