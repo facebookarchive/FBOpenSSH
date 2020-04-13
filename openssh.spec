@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb1
+%define rel 31.fb3
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -178,8 +178,7 @@ LDFLAGS="$LDFLAGS -fsanitize=address"; export LDFLAGS
 %endif
 
 %if %{kerberos5}
-K5DIR=`rpm -ql krb5-devel | grep include/krb5.h | sed 's,\/include\/krb5.h,,'`
-echo K5DIR=$K5DIR
+echo K5DIR=`krb5-config --prefix`
 %endif
 
 %configure \
@@ -190,7 +189,7 @@ echo K5DIR=$K5DIR
 	--with-superuser-path=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin \
 	--with-privsep-path=%{_var}/empty/sshd \
 	--disable-strip \
-        --with-systemd \
+  --with-systemd \
 %if %{scard}
 	--with-smartcard \
 %endif
@@ -384,6 +383,10 @@ fi
 %endif
 
 %changelog
+* Fri Apr 10 2020 Richard Scothern <rsco@fb.com>
+- change `logit` to `debug` in HPN patch for ssh server message outputs
+- configure kerberos dir with `krb5-config`
+
 * Mon Mar 16 2020 Richard Scothern <rsco@fb.com>
 - FBOpenSSH 8.0
 - https://github.com/facebookincubator/FBOpenSSH/tree/V_8_0

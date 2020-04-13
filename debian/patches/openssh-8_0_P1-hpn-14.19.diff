@@ -133,7 +133,7 @@
 +         Library of Medicine, and the National Science Foundation.
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -42,7 +42,7 @@ CC=@CC@
+@@ -43,7 +43,7 @@ CC=@CC@
  LD=@LD@
  CFLAGS=@CFLAGS@
  CPPFLAGS=-I. -I$(srcdir) @CPPFLAGS@ $(PATHS) @DEFS@
@@ -142,7 +142,7 @@
  K5LIBS=@K5LIBS@
  GSSLIBS=@GSSLIBS@
  SSHLIBS=@SSHLIBS@
-@@ -86,7 +86,7 @@ LIBOPENSSH_OBJS=\
+@@ -87,7 +87,7 @@ LIBOPENSSH_OBJS=\
  LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
  	authfd.o authfile.o \
  	canohost.o channels.o cipher.o cipher-aes.o cipher-aesctr.o \
@@ -1289,13 +1289,18 @@
  		goto out;
  	}
 +
-+	logit("SSH: Server;Ltype: Version;Remote: %s-%d;Protocol: %d.%d;Client: %.100s",
++	debug("SSH: Server;Ltype: Version;Remote: %s-%d;Protocol: %d.%d;Client: %.100s",
 +	      ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
 +	      remote_major, remote_minor, remote_version);
 +	
  	debug("Remote protocol version %d.%d, remote software version %.100s",
  	    remote_major, remote_minor, remote_version);
  	if (slog_set_client_version)
+@@ -1461,4 +1496,3 @@ kex_exchange_identification(struct ssh *
+ 	free(remote_version);
+ 	return r;
+ }
+-
 --- a/packet.c
 +++ b/packet.c
 @@ -288,7 +288,7 @@ struct ssh *
@@ -1987,7 +1992,7 @@
  			break;
  		case 'o':
  			line = xstrdup(optarg);
-@@ -1591,6 +1595,8 @@ control_persist_detach(void)
+@@ -1592,6 +1596,8 @@ control_persist_detach(void)
  	setproctitle("%s [mux]", options.control_path);
  }
  
@@ -1996,7 +2001,7 @@
  /* Do fork() after authentication. Used by "ssh -f" */
  static void
  fork_postauth(void)
-@@ -1834,6 +1840,78 @@ ssh_session2_setup(struct ssh *ssh, int
+@@ -1835,6 +1841,78 @@ ssh_session2_setup(struct ssh *ssh, int
  	    NULL, fileno(stdin), command, environ);
  }
  
@@ -2075,7 +2080,7 @@
  /* open new channel for a session */
  static int
  ssh_session2_open(struct ssh *ssh)
-@@ -1860,9 +1938,11 @@ ssh_session2_open(struct ssh *ssh)
+@@ -1861,9 +1939,11 @@ ssh_session2_open(struct ssh *ssh)
  	if (!isatty(err))
  		set_nonblock(err);
  
@@ -2088,7 +2093,7 @@
  		window >>= 1;
  		packetmax >>= 1;
  	}
-@@ -1871,6 +1951,10 @@ ssh_session2_open(struct ssh *ssh)
+@@ -1872,6 +1952,10 @@ ssh_session2_open(struct ssh *ssh)
  	    window, packetmax, CHAN_EXTENDED_WRITE,
  	    "client-session", /*nonblock*/0);
  
@@ -2099,7 +2104,7 @@
  	debug3("%s: channel_new: %d", __func__, c->self);
  
  	channel_send_open(ssh, c->self);
-@@ -1887,6 +1971,13 @@ ssh_session2(struct ssh *ssh, struct pas
+@@ -1888,6 +1972,13 @@ ssh_session2(struct ssh *ssh, struct pas
  	int r, devnull, id = -1;
  	char *cp, *tun_fwd_ifname = NULL;
  
