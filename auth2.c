@@ -818,4 +818,3 @@ auth2_update_session_info(Authctxt *authctxt, const char *method,
 	if ((r = sshbuf_put_u8(authctxt->session_info, '\n')) != 0)
 		fatal("%s: append: %s", __func__, ssh_err(r));
 }
-
