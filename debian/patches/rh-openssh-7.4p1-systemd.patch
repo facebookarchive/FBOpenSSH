@@ -52,11 +52,12 @@ new file mode 100644
 index 0000000..e0d4923
 --- /dev/null
 +++ b/contrib/sshd.service
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +[Unit]
 +Description=OpenSSH server daemon
 +Documentation=man:sshd(8) man:sshd_config(5)
-+After=network.target
++After=network.target sshd-keygen.service
++Wants=sshd-keygen.service
 +
 +[Service]
 +Type=notify
