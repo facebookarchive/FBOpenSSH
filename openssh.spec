@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb4
+%define rel 31.fb5
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -240,7 +240,7 @@ install -d $RPM_BUILD_ROOT/etc/pam.d/
 install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -d $RPM_BUILD_ROOT%{_libexecdir}/openssh
 install -m755 contrib/redhat/sshd.init $RPM_BUILD_ROOT/etc/rc.d/init.d/sshd
-install -m644 contrib/redhat/sshd.pam $RPM_BUILD_ROOT/etc/pam.d/sshd
+install -m644 contrib/sshd.pam.facebook $RPM_BUILD_ROOT/etc/pam.d/sshd
 install -d -m755 $RPM_BUILD_ROOT/%{_unitdir}
 install -m644 contrib/sshd.service $RPM_BUILD_ROOT/%{_unitdir}/sshd.service
 install -m644 sshd-keygen.service $RPM_BUILD_ROOT/%{_unitdir}/sshd-keygen.service
@@ -384,6 +384,9 @@ fi
 %endif
 
 %changelog
+* Tue Apr 21 2020 Richard Scothern <rsco@fb.com>
+- package a more modern PAM file
+
 * Fri Apr 17 2020 Richard Scothern <rsco@fb.com>
 - restore sshd-keygen.service
 
