@@ -1,0 +1,53 @@
+Index: openssh-74/session.c
+===================================================================
+--- openssh-74.orig/session.c
++++ openssh-74/session.c
+@@ -1693,17 +1693,40 @@ do_child(Session *s, const char *command
+ 
+ 	/* Change current directory to the user's home directory. */
+ 	if (chdir(pw->pw_dir) < 0) {
+-		/* Suppress missing homedir warning for chroot case */
++		if (errno == EACCES) {
++	    	int retry;
++			logit("Failed to chdir to home on first attempt.  Retrying.");
++			/* retry 3 more times just in case this is NFS and automount is slow */
++		    for (retry = 0; retry < 3; retry++) {
++                sleep (1);
++				if (chdir(pw->pw_dir) < 0) {
++					logit("Failed chdir(%s) attempt %d: %s", pw->pw_dir, retry, strerror(errno));
++				} else {
++					break;
++				}
++			}
++			if (retry == 3) {
++				goto missing_homedir;
++			}
++		} else {
++missing_homedir:
++			/* Suppress missing homedir warning for chroot case */
+ #ifdef HAVE_LOGIN_CAP
+-		r = login_getcapbool(lc, "requirehome", 0);
++			r = login_getcapbool(lc, "requirehome", 0);
++#else
++			r = 0;
+ #endif
+-		if (r || !in_chroot) {
+-			fprintf(stderr, "Could not chdir to home "
+-			    "directory %s: %s\n", pw->pw_dir,
+-			    strerror(errno));
++			if (r || !in_chroot) {
++				logit("Could not chdir to home directory %s: %s", pw->pw_dir,
++					strerror(errno));
++				if (s->ttyfd != -1)
++			        fprintf(stderr, "Could not chdir to home "
++		 	           "directory %s: %s\n", pw->pw_dir,
++		 	           strerror(errno));
++			}
++			if (r)
++				exit(1);
+ 		}
+-		if (r)
+-			exit(1);
+ 	}
+ 
+ 	do_rc_files(s, shell);

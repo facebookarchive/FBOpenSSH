@@ -1,5 +1,5 @@
 rh-openssh-6.7p1-coverity.patch
-rh-openssh-7.6p1-audit.patch    
+rh-openssh-7.6p1-audit.patch
 rh-openssh-7.1p2-audit-race-condition.patch
 rh-openssh-7.8p1-role-mls.patch
 rh-openssh-6.6p1-privsep-selinux.patch
@@ -35,3 +35,4 @@ rh-openssh-8.0p1-openssl-kdf.patch
 rh-openssh-8.0p1-openssl-pem.patch
 rh-openssh-8.0p1-entropy.patch
 openssh-8_0_P1-hpn-14.19.diff
+fb-no-chdir-home-dir-error-with-no-tty-and-retry-chdir-on-fail.patch

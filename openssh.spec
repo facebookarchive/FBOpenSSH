@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb5
+%define rel 31.fb6
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -384,6 +384,9 @@ fi
 %endif
 
 %changelog
+* Mon Jun 8 2020 Richard Scothern <rsco@fb.com>
+- include patch to hide chdir message from stdout
+
 * Tue Apr 21 2020 Richard Scothern <rsco@fb.com>
 - package a more modern PAM file
 
