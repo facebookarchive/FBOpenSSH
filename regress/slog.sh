@@ -83,7 +83,7 @@ json_grep() {
 		local json="$logline"
 	fi
 
-	if val=$(echo "$json" | python -c "import sys, json; print(json.load(sys.stdin)['$key'])" 2>/dev/null); then
+	if val=$(echo "$json" | python3 -c "import sys, json; print(json.load(sys.stdin)['$key'])" 2>/dev/null); then
 		echo "$val"
 	else
 		return 1
@@ -101,18 +101,18 @@ test_basic_logging() {
 		fail "expected 2 structured logging lines, got $cnt"
 	fi
 
-	if ! which python &>/dev/null; then
-		echo 'python not found in path, skipping JSON tests'
-		return 1
+	if ! which python3 &>/dev/null; then
+		echo 'python3 not found in path, skipping JSON tests'
+		exit 1
 	fi
 
 	local loglines=$(grep "$LOG_PREFIX" "$TEST_SSHD_LOGFILE")
 	local first=$(echo "$loglines" | head -n1)
 	local last=$(echo "$loglines" | tail -n1)
 
-	echo ${first:$(expr length $LOG_PREFIX)} | python -m json.tool &>/dev/null ||
+	echo ${first:$(expr length $LOG_PREFIX)} | python3 -m json.tool &>/dev/null ||
 		fail "invalid json structure $first"
-	echo ${last:$(expr length $LOG_PREFIX)} | python -m json.tool &>/dev/null ||
+	echo ${last:$(expr length $LOG_PREFIX)} | python3 -m json.tool &>/dev/null ||
 		fail "invalid json structure $last"
 }
 
