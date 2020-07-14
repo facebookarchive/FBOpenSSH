@@ -141,6 +141,11 @@ test_auth_info() {
 		fail "serial not found"
 }
 
+test_auth_info_with_failed_auth() {
+    auth_info=$(extract_key 'auth_info') &&
+            fail "auth info found"
+}
+
 test_cert() {
 	local serial=$1
 	local princ=$2
@@ -230,6 +235,7 @@ ${SSH} -F $OBJ/ssh_config -i "$IDENTITY_FILE-cert.pub" somehost true &&
 	fatal "SSH succeeded unexpectedly"
 
 test_failed_session
+test_auth_info_with_failed_auth
 
 echo $CERT_PRINC > $AUTH_PRINC_FILE
 
