@@ -500,19 +500,17 @@ slog_get_safe_from_token(char *output, const char *token)
 
 	// Arbitrary input
 	if (strcmp(token, cert_id_token) == 0) {
-		if (slogctxt->cert_id[0] != 0 &&
-		    strcmp(slogctxt->method, "publickey") == 0) {
-				slog_escape_value(output, slogctxt->cert_id,
-				    SLOG_STRING_LEN * 2 + 1);
+		if (slogctxt->cert_id[0] != 0) {
+			slog_escape_value(output, slogctxt->cert_id,
+			    SLOG_STRING_LEN * 2 + 1);
 		}
 		return;
 	}
 
 	if (strcmp(token, cert_serial_token) == 0) {
-		if (slogctxt->cert_serial > 0 &&
-		    strcmp(slogctxt->method, "publickey") == 0) {
-			snprintf(output, SLOG_SHORT_STRING_LEN, "\"%llu\"",
-			    slogctxt->cert_serial);
+		if (slogctxt->cert_serial > 0) {
+            snprintf(output, SLOG_SHORT_STRING_LEN, "\"%llu\"",
+                slogctxt->cert_serial);
 		}
 		return;
 	}
