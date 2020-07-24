@@ -126,7 +126,10 @@ slog_set_auth_data(int authenticated, const char *method, const char *user)
 	if (slogctxt != NULL) {
 		slogctxt->auth_successful =
 		    authenticated ? SLOG_AUTHORIZED : SLOG_UNAUTHORIZED;
-		strlcpy(slogctxt->method, method, SLOG_SHORT_STRING_LEN);
+        if (slogctxt->method[0] != '\0') {
+            strlcat(slogctxt->method, ",", SLOG_SHORT_STRING_LEN);
+        }
+        strlcat(slogctxt->method, method, SLOG_SHORT_STRING_LEN);
 		strlcpy(slogctxt->user, user, SLOG_STRING_LEN);
 	}
 }
