@@ -35,3 +35,4 @@ rh-openssh-8.0p1-openssl-kdf.patch
 rh-openssh-8.0p1-openssl-pem.patch
 rh-openssh-8.0p1-entropy.patch
 fb-no-chdir-home-dir-error-with-no-tty-and-retry-chdir-on-fail.patch
+fb-openssh-8-0p1-default-channel-buffers.patch
