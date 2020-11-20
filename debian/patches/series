@@ -34,5 +34,4 @@ rh-openssh-8.0p1-openssl-evp.patch
 rh-openssh-8.0p1-openssl-kdf.patch
 rh-openssh-8.0p1-openssl-pem.patch
 rh-openssh-8.0p1-entropy.patch
-openssh-8_0_P1-hpn-14.19.diff
 fb-no-chdir-home-dir-error-with-no-tty-and-retry-chdir-on-fail.patch
