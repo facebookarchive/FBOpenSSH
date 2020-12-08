@@ -1,0 +1,128 @@
+diff --git a/readconf.c b/readconf.c
+index ec497e79..0c4cad11 100644
+--- a/readconf.c
++++ b/readconf.c
+@@ -162,6 +162,7 @@ typedef enum {
+ 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
+ 	oEnableSSHKeysign, oRekeyLimit, oVerifyHostKeyDNS, oConnectTimeout,
+ 	oAddressFamily, oGssAuthentication, oGssDelegateCreds,
++	oGssServerIdentity,
+ 	oServerAliveInterval, oServerAliveCountMax, oIdentitiesOnly,
+ 	oSendEnv, oSetEnv, oControlPath, oControlMaster, oControlPersist,
+ 	oHashKnownHosts,
+@@ -203,9 +204,11 @@ static struct {
+ #if defined(GSSAPI)
+ 	{ "gssapiauthentication", oGssAuthentication },
+ 	{ "gssapidelegatecredentials", oGssDelegateCreds },
++	{ "gssapiserveridentity", oGssServerIdentity },
+ # else
+ 	{ "gssapiauthentication", oUnsupported },
+ 	{ "gssapidelegatecredentials", oUnsupported },
++	{ "gssapiserveridentity", oUnsupported },
+ #endif
+ #ifdef ENABLE_PKCS11
+ 	{ "pkcs11provider", oPKCS11Provider },
+@@ -987,6 +990,10 @@ parse_time:
+ 		intptr = &options->gss_deleg_creds;
+ 		goto parse_flag;
+ 
++	case oGssServerIdentity:
++		charptr = &options->gss_server_identity;
++		goto parse_string;
++
+ 	case oBatchMode:
+ 		intptr = &options->batch_mode;
+ 		goto parse_flag;
+@@ -1855,6 +1862,7 @@ initialize_options(Options * options)
+ 	options->challenge_response_authentication = -1;
+ 	options->gss_authentication = -1;
+ 	options->gss_deleg_creds = -1;
++	options->gss_server_identity = NULL;
+ 	options->password_authentication = -1;
+ 	options->kbd_interactive_authentication = -1;
+ 	options->kbd_interactive_devices = NULL;
+@@ -2617,6 +2625,7 @@ dump_client_config(Options *o, const char *host)
+ #ifdef GSSAPI
+ 	dump_cfg_fmtint(oGssAuthentication, o->gss_authentication);
+ 	dump_cfg_fmtint(oGssDelegateCreds, o->gss_deleg_creds);
++	dump_cfg_string(oGssServerIdentity, o->gss_server_identity);
+ #endif /* GSSAPI */
+ 	dump_cfg_fmtint(oHashKnownHosts, o->hash_known_hosts);
+ 	dump_cfg_fmtint(oHostbasedAuthentication, o->hostbased_authentication);
+diff --git a/readconf.h b/readconf.h
+index 8e36bf32..934e4ab5 100644
+--- a/readconf.h
++++ b/readconf.h
+@@ -41,6 +41,7 @@ typedef struct {
+ 					/* Try S/Key or TIS, authentication. */
+ 	int     gss_authentication;	/* Try GSS authentication */
+ 	int     gss_deleg_creds;	/* Delegate GSS credentials */
++	char    *gss_server_identity;   /* GSSAPI target principal */
+ 	int     password_authentication;	/* Try password
+ 						 * authentication. */
+ 	int     kbd_interactive_authentication; /* Try keyboard-interactive auth. */
+diff --git a/ssh.1 b/ssh.1
+index 4afb1ab0..b35ce4c5 100644
+--- a/ssh.1
++++ b/ssh.1
+@@ -498,6 +498,7 @@ For full details of the options listed below, and their possible values, see
+ .It GlobalKnownHostsFile
+ .It GSSAPIAuthentication
+ .It GSSAPIDelegateCredentials
++.It GSSAPIServerIdentity
+ .It HashKnownHosts
+ .It Host
+ .It HostbasedAuthentication
+diff --git a/ssh_config.5 b/ssh_config.5
+index a211034e..1d2638bd 100644
+--- a/ssh_config.5
++++ b/ssh_config.5
+@@ -758,6 +758,11 @@ The default is
+ Forward (delegate) credentials to the server.
+ The default is
+ .Cm no .
++.It Cm GSSAPIServerIdentity
++If set, specifies the GSSAPI server identity that ssh should expect when
++connecting to the server. The default is unset, which means that the
++expected GSSAPI server identity will be determined from the target
++hostname.
+ .It Cm HashKnownHosts
+ Indicates that
+ .Xr ssh 1
+diff --git a/sshconnect2.c b/sshconnect2.c
+index dffee90b..a7583453 100644
+--- a/sshconnect2.c
++++ b/sshconnect2.c
+@@ -699,6 +699,16 @@ userauth_gssapi(struct ssh *ssh)
+ 	int r, ok = 0;
+ 	gss_OID mech = NULL;
+ 
++	char *gss_host;
++
++	if (options.gss_server_identity) {
++		gss_host = xstrdup(options.gss_server_identity);
++		debug("Using user defined gss host: %s", gss_host);
++	}
++	else {
++		gss_host = xstrdup(authctxt->host);
++	}
++
+ 	/* Try one GSSAPI method at a time, rather than sending them all at
+ 	 * once. */
+ 
+@@ -712,13 +722,14 @@ userauth_gssapi(struct ssh *ssh)
+ 		    elements[authctxt->mech_tried];
+ 		/* My DER encoding requires length<128 */
+ 		if (mech->length < 128 && ssh_gssapi_check_mechanism(&gssctxt,
+-		    mech, authctxt->host)) {
++		    mech, gss_host)) {
+ 			ok = 1; /* Mechanism works */
+ 		} else {
+ 			authctxt->mech_tried++;
+ 		}
+ 	}
+ 
++	free(gss_host);
+ 	if (!ok || mech == NULL)
+ 		return 0;
+ 

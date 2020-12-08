@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb7
+%define rel 31.fb8
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -384,6 +384,8 @@ fi
 %endif
 
 %changelog
+* Tue Dec 8 2020 Richard Scothern <rsco@fb.com>
+- support GSSAPIServerIdentity in client
 * Wed Dec 2 2020 Johan Schuijt-Li <jschuijt@fb.com>
 - remove HPN patch, since OpenSSH 7.6 release having HPN enabled
   decreases throughput
