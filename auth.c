@@ -329,8 +329,11 @@ auth_log(struct ssh *ssh, int authenticated, int partial,
 
 	if (authctxt->postponed)
 		authmsg = "Postponed";
-	else if (partial)
+	else if (partial) {
 		authmsg = "Partial";
+		// Update partial auth timestamp
+		slog_set_last_partial_auth_time();
+	}
 	else
 		authmsg = authenticated ? "Accepted" : "Failed";
 

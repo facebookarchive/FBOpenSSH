@@ -2100,6 +2100,9 @@ main(int ac, char **av)
 	authctxt = xcalloc(1, sizeof(*authctxt));
 	ssh->authctxt = authctxt;
 
+	// Set auth start timestamp
+	slog_set_auth_start();
+
 	authctxt->loginmsg = loginmsg;
 
 	/* XXX global for cleanup, access from other modules */
@@ -2140,6 +2143,10 @@ main(int ac, char **av)
 	}
 
  authenticated:
+
+	// Set auth end timestamp
+	slog_set_auth_end();
+
 	/*
 	 * Cancel the alarm we set to limit the time taken for
 	 * authentication.
