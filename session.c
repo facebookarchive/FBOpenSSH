@@ -1684,9 +1684,13 @@ do_child(struct ssh *ssh, Session *s, const char *command)
 		r = login_getcapbool(lc, "requirehome", 0);
 #endif
 		if (r || !in_chroot) {
-			fprintf(stderr, "Could not chdir to home "
+			logit(stderr, "Could not chdir to home "
 			    "directory %s: %s\n", pw->pw_dir,
 			    strerror(errno));
+			if (s->ttyfd != -1)
+			        fprintf(stderr, "Could not chdir to home "
+		 	           "directory %s: %s\n", pw->pw_dir,
+		 	           strerror(errno));
 		}
 		if (r)
 			exit(1);
