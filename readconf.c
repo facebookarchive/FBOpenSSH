@@ -162,6 +162,7 @@ typedef enum {
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oEnableSSHKeysign, oRekeyLimit, oVerifyHostKeyDNS, oConnectTimeout,
 	oAddressFamily, oGssAuthentication, oGssDelegateCreds,
+	oGssServerIdentity,
 	oServerAliveInterval, oServerAliveCountMax, oIdentitiesOnly,
 	oSendEnv, oSetEnv, oControlPath, oControlMaster, oControlPersist,
 	oHashKnownHosts,
@@ -203,9 +204,11 @@ static struct {
 #if defined(GSSAPI)
 	{ "gssapiauthentication", oGssAuthentication },
 	{ "gssapidelegatecredentials", oGssDelegateCreds },
+	{ "gssapiserveridentity", oGssServerIdentity },
 # else
 	{ "gssapiauthentication", oUnsupported },
 	{ "gssapidelegatecredentials", oUnsupported },
+	{ "gssapiserveridentity", oUnsupported },
 #endif
 #ifdef ENABLE_PKCS11
 	{ "pkcs11provider", oPKCS11Provider },
@@ -991,6 +994,10 @@ parse_time:
 	case oGssDelegateCreds:
 		intptr = &options->gss_deleg_creds;
 		goto parse_flag;
+
+	case oGssServerIdentity:
+		charptr = &options->gss_server_identity;
+		goto parse_string;
 
 	case oBatchMode:
 		intptr = &options->batch_mode;
@@ -1864,6 +1871,7 @@ initialize_options(Options * options)
 	options->challenge_response_authentication = -1;
 	options->gss_authentication = -1;
 	options->gss_deleg_creds = -1;
+	options->gss_server_identity = NULL;
 	options->password_authentication = -1;
 	options->kbd_interactive_authentication = -1;
 	options->kbd_interactive_devices = NULL;
@@ -2626,6 +2634,7 @@ dump_client_config(Options *o, const char *host)
 #ifdef GSSAPI
 	dump_cfg_fmtint(oGssAuthentication, o->gss_authentication);
 	dump_cfg_fmtint(oGssDelegateCreds, o->gss_deleg_creds);
+	dump_cfg_string(oGssServerIdentity, o->gss_server_identity);
 #endif /* GSSAPI */
 	dump_cfg_fmtint(oHashKnownHosts, o->hash_known_hosts);
 	dump_cfg_fmtint(oHostbasedAuthentication, o->hostbased_authentication);

@@ -41,6 +41,7 @@ typedef struct {
 					/* Try S/Key or TIS, authentication. */
 	int     gss_authentication;	/* Try GSS authentication */
 	int     gss_deleg_creds;	/* Delegate GSS credentials */
+	char    *gss_server_identity;   /* GSSAPI target principal */
 	int     password_authentication;	/* Try password
 						 * authentication. */
 	int     kbd_interactive_authentication; /* Try keyboard-interactive auth. */

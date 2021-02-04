@@ -698,6 +698,16 @@ userauth_gssapi(struct ssh *ssh)
 	int r, ok = 0;
 	gss_OID mech = NULL;
 
+	char *gss_host;
+
+	if (options.gss_server_identity) {
+		gss_host = xstrdup(options.gss_server_identity);
+		debug("Using user defined gss host: %s", gss_host);
+	}
+	else {
+		gss_host = xstrdup(authctxt->host);
+	}
+
 	/* Try one GSSAPI method at a time, rather than sending them all at
 	 * once. */
 
@@ -711,13 +721,14 @@ userauth_gssapi(struct ssh *ssh)
 		    elements[authctxt->mech_tried];
 		/* My DER encoding requires length<128 */
 		if (mech->length < 128 && ssh_gssapi_check_mechanism(&gssctxt,
-		    mech, authctxt->host)) {
+		    mech, gss_host)) {
 			ok = 1; /* Mechanism works */
 		} else {
 			authctxt->mech_tried++;
 		}
 	}
 
+	free(gss_host);
 	if (!ok || mech == NULL)
 		return 0;
 
