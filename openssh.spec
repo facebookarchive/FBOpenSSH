@@ -240,7 +240,7 @@ install -d $RPM_BUILD_ROOT/etc/pam.d/
 install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -d $RPM_BUILD_ROOT%{_libexecdir}/openssh
 install -m755 contrib/redhat/sshd.init $RPM_BUILD_ROOT/etc/rc.d/init.d/sshd
-install -m644 contrib/redhat/sshd.pam $RPM_BUILD_ROOT/etc/pam.d/sshd
+install -m644 contrib/sshd.pam.facebook $RPM_BUILD_ROOT/etc/pam.d/sshd
 install -d -m755 $RPM_BUILD_ROOT/%{_unitdir}
 install -m644 contrib/sshd.service $RPM_BUILD_ROOT/%{_unitdir}/sshd.service
 install -m644 sshd-keygen.service $RPM_BUILD_ROOT/%{_unitdir}/sshd-keygen.service
