@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb3
+%define rel 31.fb7
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -383,6 +383,21 @@ fi
 %endif
 
 %changelog
+* Wed Dec 2 2020 Johan Schuijt-Li <jschuijt@fb.com>
+- remove HPN patch, since OpenSSH 7.6 release having HPN enabled
+  decreases throughput
+- increase default buffer sizes for channels to have higher
+  throughput on high-latency connections
+
+* Mon Jun 8 2020 Richard Scothern <rsco@fb.com>
+- include patch to hide chdir message from stdout
+
+* Tue Apr 21 2020 Richard Scothern <rsco@fb.com>
+- package a more modern PAM file
+
+* Fri Apr 17 2020 Richard Scothern <rsco@fb.com>
+- restore sshd-keygen.service
+
 * Fri Apr 10 2020 Richard Scothern <rsco@fb.com>
 - change `logit` to `debug` in HPN patch for ssh server message outputs
 - configure kerberos dir with `krb5-config`
