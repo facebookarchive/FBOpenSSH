@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenSSH Server Key Generation
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_rsa_key
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_ecdsa_key
+ConditionFileNotEmpty=|!/etc/ssh/ssh_host_ed25519_key
+PartOf=sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ssh-keygen -A
+ExecStartPost=-/sbin/restorecon /etc/ssh/ssh_host_key.pub
+ExecStartPost=-/sbin/restorecon /etc/ssh/ssh_host_rsa_key.pub
+ExecStartPost=-/sbin/restorecon /etc/ssh/ssh_host_dsa_key.pub
+ExecStartPost=-/sbin/restorecon /etc/ssh/ssh_host_ecdsa_key.pub
+RemainAfterExit=yes

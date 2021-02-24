@@ -243,7 +243,7 @@ install -m755 contrib/redhat/sshd.init $RPM_BUILD_ROOT/etc/rc.d/init.d/sshd
 install -m644 contrib/redhat/sshd.pam $RPM_BUILD_ROOT/etc/pam.d/sshd
 install -d -m755 $RPM_BUILD_ROOT/%{_unitdir}
 install -m644 contrib/sshd.service $RPM_BUILD_ROOT/%{_unitdir}/sshd.service
-
+install -m644 sshd-keygen.service $RPM_BUILD_ROOT/%{_unitdir}/sshd-keygen.service
 
 %if ! %{no_gnome_askpass}
 install -s contrib/gnome-ssh-askpass $RPM_BUILD_ROOT%{_libexecdir}/openssh/gnome-ssh-askpass
@@ -373,6 +373,7 @@ fi
 %attr(0600,root,root) %config(noreplace) /etc/pam.d/sshd
 %attr(0755,root,root) %config /etc/rc.d/init.d/sshd
 %attr(0644,root,root) %{_unitdir}/sshd.service
+%attr(0644,root,root) %{_unitdir}/sshd-keygen.service
 %endif
 
 %if ! %{no_gnome_askpass}
