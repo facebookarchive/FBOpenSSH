@@ -11,12 +11,6 @@
 %define sshd_uid    74
 %define sshd_gid    74
 
-# Version of ssh-askpass
-%define aversion 1.2.4.1
-
-# Do we want to disable building of x11-askpass? (1=yes 0=no)
-%define no_x11_askpass 1
-
 # Do we want to disable building of gnome-askpass? (1=yes 0=no)
 %define no_gnome_askpass 1
 
@@ -32,22 +26,6 @@
 # Mock doesn't seem to define 'rhel' macro, so we create it here:
 %define rhel %(/usr/lib/rpm/redhat/dist.sh --distnum)
 
-# Is this build for RHL 6.x?
-%define build6x 0
-
-# Is this build for RHL 7.x?
-%define build7x 0
-
-# Is this a build for RHL 7.x or later?
-%if 0%{rhel} >= 7
-%define build7x 1
-%endif
-
-# Is this a build for RHL 6.x or later?
-%if 0%{rhel} >= 6
-%define build6x 1
-%endif
-
 # Do we want kerberos5 support (1=yes 0=no)
 %define kerberos5 1
 
@@ -56,18 +34,12 @@
 
 # Reserve options to override askpass settings with:
 # rpm -ba|--rebuild --define 'skip_xxx 1'
-%{?skip_x11_askpass:%define no_x11_askpass 1}
 %{?skip_gnome_askpass:%define no_gnome_askpass 1}
 
 # Add option to build without GTK2 for older platforms with only GTK+.
 # RedHat <= 7.2 and Red Hat Advanced Server 2.1 are examples.
 # rpm -ba|--rebuild --define 'no_gtk2 1'
 %{?no_gtk2:%define gtk2 0}
-
-# If this is RHL 6.x, the default configuration has sysconfdir in /usr/etc.
-%if %{build6x}
-%define _sysconfdir /etc
-%endif
 
 # Options for static OpenSSL link:
 # rpm -ba|--rebuild --define "static_openssl 1"
@@ -77,9 +49,6 @@
 # rpm -ba|--rebuild --define "smartcard 1"
 %{?smartcard:%define scard 1}
 
-# which sandbox to use
-%define sandbox none
-
 # Is this a build for the rescue CD (without PAM, with MD5)? (1=yes 0=no)
 %define rescue 0
 %{?build_rescue:%define rescue 1}
@@ -87,11 +56,10 @@
 # Turn off some stuff for rescue builds
 %if %{rescue}
 %define kerberos5 0
-%define sandbox none
 %endif
 
 
-Summary: The OpenSSH implementation of SSH protocol versions 1 and 2.
+Summary: An open source implementation of SSH protocol version 2
 Name: openssh
 Version: %{ver}
 %if %{rescue}
@@ -105,42 +73,20 @@ Release: %{rel}.el%{rhel}
 %endif
 URL: http://www.openssh.com/portable.html
 Source0: ftp://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-%{version}-%{rel}.tar.gz
-%if ! %{no_x11_askpass}
-Source1: http://www.jmknoble.net/software/x11-ssh-askpass/x11-ssh-askpass-%{aversion}.tar.gz
-%endif
 License: BSD
 Group: Applications/Internet
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{rel}.el%{rhel}.buildroot
 Obsoletes: ssh
 BuildRequires: redhat-rpm-config, autoconf, automake
-BuildRequires: perl, openssl-devel >= 1.1.1c, quilt
-# Building an address sanatizer version requires this lib
+BuildRequires: perl, openssl-devel >= 1.1.1c, quilt, fipscheck-devel
 %if %{asan}
 BuildRequires: libasan
 %endif
-%if %{build7x}
 BuildRequires: /usr/bin/login
-%endif
-%if %{build6x}
-Requires: initscripts >= 5.00
-%else
 Requires: initscripts >= 5.20
-%endif
-BuildRequires: perl, openssl-devel >= 1.1.1c, quilt
-%if %{build7x}
-BuildRequires: /usr/bin/login
+BuildRequires: perl, openssl-devel >= 1.1.1c, quilt,
 BuildRequires: systemd
-%else
-BuildRequires: /bin/login
-%endif
-%if ! %{build6x}
 BuildRequires: glibc-devel, pam-devel
-%else
-BuildRequires: /usr/include/security/pam_appl.h
-%endif
-%if ! %{no_x11_askpass}
-BuildRequires: /usr/include/X11/Xlib.h
-%endif
 %if ! %{no_gnome_askpass}
 BuildRequires: pkgconfig
 %endif
@@ -160,17 +106,11 @@ Summary: The OpenSSH server daemon.
 Group: System Environment/Daemons
 Obsoletes: ssh-server
 Requires: openssh = %{version}-%{release}, chkconfig >= 0.9
-%if ! %{build6x}
 Requires: /etc/pam.d/system-auth
-%endif
-%if %{build7x}
 Requires: systemd
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
-%else
-Requires: initscripts >= 5.00
-%endif
 
 %package askpass
 Summary: A passphrase dialog for OpenSSH and X.
@@ -192,8 +132,7 @@ untrusted hosts over an insecure network. X11 connections and
 arbitrary TCP/IP ports can also be forwarded over the secure channel.
 
 OpenSSH is OpenBSD's version of the last free version of SSH, bringing
-it up to date in terms of security and features, as well as removing
-all patented algorithms to separate libraries.
+it up to date in terms of security and features.
 
 This package includes the core files necessary for both the OpenSSH
 client and server. To make this package useful, you should also
@@ -203,14 +142,12 @@ install openssh-clients, openssh-server, or both.
 OpenSSH is a free version of SSH (Secure SHell), a program for logging
 into and executing commands on a remote machine. This package includes
 the clients necessary to make encrypted connections to SSH servers.
-You'll also need to install the openssh package on OpenSSH clients.
 
 %description server
 OpenSSH is a free version of SSH (Secure SHell), a program for logging
 into and executing commands on a remote machine. This package contains
 the secure shell daemon (sshd). The sshd daemon allows SSH clients to
-securely connect to your SSH server. You also need to have the openssh
-package installed.
+securely connect to your SSH server.
 
 %description askpass
 OpenSSH is a free version of SSH (Secure SHell), a program for logging
@@ -224,16 +161,11 @@ an X11 passphrase dialog for OpenSSH and the GNOME GUI desktop
 environment.
 
 %prep
-%if ! %{no_x11_askpass}
-%setup -q -a 1 -n openssh-%{version}-%{rel}
-%else
 %setup -q -n openssh-%{version}-%{rel}
-%endif
 quilt push -a
 
-# Regenerate all generated file to take into account changes from the patches (configure, config.h ...)
+# Regenerate all generated files to take into account changes from the patches (configure, config.h ...)
 autoreconf
-
 
 %build
 %if %{rescue}
@@ -269,7 +201,6 @@ echo K5DIR=$K5DIR
 %if %{kerberos5}
 	 --with-kerberos5=$K5DIR \
 %endif
-  --with-sandbox=%{sandbox}
 
 
 %if %{static_libcrypto}
@@ -277,14 +208,6 @@ perl -pi -e "s|-lcrypto|%{_libdir}/libcrypto.a|g" Makefile
 %endif
 
 make
-
-%if ! %{no_x11_askpass}
-pushd x11-ssh-askpass-%{aversion}
-%configure --libexecdir=%{_libexecdir}/openssh
-xmkmf -a
-make
-popd
-%endif
 
 # Define a variable to toggle gnome1/gtk2 building.  This is necessary
 # because RPM doesn't handle nested %if statements.
@@ -311,24 +234,16 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p -m755 $RPM_BUILD_ROOT%{_sysconfdir}/ssh
 mkdir -p -m755 $RPM_BUILD_ROOT%{_libexecdir}/openssh
 mkdir -p -m755 $RPM_BUILD_ROOT%{_var}/empty/sshd
-
 make install DESTDIR=$RPM_BUILD_ROOT
 
 install -d $RPM_BUILD_ROOT/etc/pam.d/
 install -d $RPM_BUILD_ROOT/etc/rc.d/init.d
 install -d $RPM_BUILD_ROOT%{_libexecdir}/openssh
-install -m644 contrib/centos6/sshd.pam    $RPM_BUILD_ROOT/etc/pam.d/sshd
 install -m755 contrib/redhat/sshd.init $RPM_BUILD_ROOT/etc/rc.d/init.d/sshd
-%if %{build7x}
+install -m644 contrib/redhat/sshd.pam $RPM_BUILD_ROOT/etc/pam.d/sshd
 install -d -m755 $RPM_BUILD_ROOT/%{_unitdir}
-install -m644 sshd.service $RPM_BUILD_ROOT/%{_unitdir}/sshd.service
-install -m644 sshd-keygen.service $RPM_BUILD_ROOT/%{_unitdir}/sshd-keygen.service
-%endif
+install -m644 contrib/sshd.service $RPM_BUILD_ROOT/%{_unitdir}/sshd.service
 
-%if ! %{no_x11_askpass}
-install -s x11-ssh-askpass-%{aversion}/x11-ssh-askpass $RPM_BUILD_ROOT%{_libexecdir}/openssh/x11-ssh-askpass
-ln -s x11-ssh-askpass $RPM_BUILD_ROOT%{_libexecdir}/openssh/ssh-askpass
-%endif
 
 %if ! %{no_gnome_askpass}
 install -s contrib/gnome-ssh-askpass $RPM_BUILD_ROOT%{_libexecdir}/openssh/gnome-ssh-askpass
@@ -354,7 +269,6 @@ install -m 755 contrib/redhat/gnome-ssh-askpass.sh $RPM_BUILD_ROOT%{_sysconfdir}
 perl -pi -e "s|$RPM_BUILD_ROOT||g" $RPM_BUILD_ROOT%{_mandir}/man*/*
 
 # Remove files added by RH patches that we actually don't need (FIPS related)
-rm $RPM_BUILD_ROOT%{_libexecdir}/openssh/ctr-cavstest
 rm $RPM_BUILD_ROOT%{_libexecdir}/openssh/ssh-cavs
 rm $RPM_BUILD_ROOT%{_libexecdir}/openssh/ssh-cavs_driver.pl
 
@@ -396,34 +310,17 @@ fi
 	-g sshd -M -r sshd 2>/dev/null || :
 
 %post server
-%if %{build7x}
 %systemd_post sshd.service
-%else
-/sbin/chkconfig --add sshd
-/sbin/service sshd condrestart > /dev/null 2>&1 || :
-%endif
 
 %postun server
-%if %{build7x}
 %systemd_postun_with_restart sshd.service
-%else
-/sbin/service sshd condrestart > /dev/null 2>&1 || :
-%endif
 
 %preun server
-%if %{build7x}
 %systemd_preun sshd.service
-%else
-if [ "$1" = 0 ]
-then
-	/sbin/service sshd stop > /dev/null 2>&1 || :
-	/sbin/chkconfig --del sshd
-fi
-%endif
 
 %files
 %defattr(-,root,root)
-%doc CREDITS ChangeLog INSTALL LICENCE OVERVIEW README* PROTOCOL* TODO
+%doc CREDITS CHANGES.md INSTALL LICENCE OVERVIEW README* PROTOCOL* TODO
 %attr(0755,root,root) %{_bindir}/scp
 %attr(0644,root,root) %{_mandir}/man1/scp.1*
 %attr(0755,root,root) %dir %{_sysconfdir}/ssh
@@ -475,20 +372,7 @@ fi
 %attr(0600,root,root) %config(noreplace) %{_sysconfdir}/ssh/sshd_config
 %attr(0600,root,root) %config(noreplace) /etc/pam.d/sshd
 %attr(0755,root,root) %config /etc/rc.d/init.d/sshd
-%if %{build7x}
 %attr(0644,root,root) %{_unitdir}/sshd.service
-%attr(0644,root,root) %{_unitdir}/sshd-keygen.service
-%endif
-%endif
-
-%if ! %{no_x11_askpass}
-%files askpass
-%defattr(-,root,root)
-%doc x11-ssh-askpass-%{aversion}/README
-%doc x11-ssh-askpass-%{aversion}/ChangeLog
-%doc x11-ssh-askpass-%{aversion}/SshAskpass*.ad
-%attr(0755,root,root) %{_libexecdir}/openssh/ssh-askpass
-%attr(0755,root,root) %{_libexecdir}/openssh/x11-ssh-askpass
 %endif
 
 %if ! %{no_gnome_askpass}
