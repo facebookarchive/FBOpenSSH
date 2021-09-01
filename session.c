@@ -1244,6 +1244,10 @@ do_setup_env(struct ssh *ssh, Session *s, const char *shell)
 		}
 	}
 
+  /* set LOG_SESSION_ID for child */
+  child_set_env(&env, &envsize, "LOG_SESSION_ID", get_log_session_id());
+  debug("set LOG_SESION_ID to: %s", get_log_session_id());
+
 	if (debug_flag) {
 		/* dump the environment */
 		fprintf(stderr, "Environment:\n");
