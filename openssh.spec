@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb8
+%define rel 31.fb9
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
@@ -384,6 +384,10 @@ fi
 %endif
 
 %changelog
+* Fri Sep 17 2021 Sean Mikul Rodman <srodman@fb.com>
+- temporarily add HPN patches back in, to be removed again in 8.4 release.
+* Wed Sep 1 2021 Sean Mikul Rodman <srodman@fb.com>
+- set LOG_SESSION_ID environment variable for all ssh sessions
 * Tue Dec 8 2020 Richard Scothern <rsco@fb.com>
 - support GSSAPIServerIdentity in client
 * Wed Dec 2 2020 Johan Schuijt-Li <jschuijt@fb.com>
