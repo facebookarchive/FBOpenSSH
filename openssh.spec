@@ -384,8 +384,6 @@ fi
 %endif
 
 %changelog
-* Fri Sep 17 2021 Sean Mikul Rodman <srodman@fb.com>
-- temporarily add HPN patches back in, to be removed again in 8.4 release.
 * Wed Sep 1 2021 Sean Mikul Rodman <srodman@fb.com>
 - set LOG_SESSION_ID environment variable for all ssh sessions
 * Tue Dec 8 2020 Richard Scothern <rsco@fb.com>
