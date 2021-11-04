@@ -5,7 +5,7 @@
 # openssh-server-7.4p1-12 takes over openssh-7.4p1-fb1
 # So in order to cope with future updates we make some room, 30 should leave
 # enough of space) and postfix with .fb and then our release marker
-%define rel 31.fb9
+%define rel 31.fb10
 
 # OpenSSH privilege separation requires a user & group ID
 %define sshd_uid    74
